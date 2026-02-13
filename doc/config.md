@@ -1,0 +1,357 @@
+# 配置模块 (Config Module)
+
+## 1. 模块概述
+
+配置模块负责管理 AutoTest 插件的所有配置信息，包括服务器连接、命令执行、AI 服务和日志监控等配置项。模块支持自动创建默认配置文件，并提供配置加载、获取和重载功能。
+
+## 2. 设计方案
+
+### 2.1 架构设计
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Config Module                           │
+├─────────────────────────────────────────────────────────────┤
+│  ┌─────────────────┐  ┌─────────────────┐                  │
+│  │  defaultConfig  │  │  loadConfig()   │                  │
+│  │  (默认配置)      │  │  (加载配置)     │                  │
+│  └─────────────────┘  └─────────────────┘                  │
+│                                                              │
+│  ┌─────────────────┐  ┌─────────────────┐                  │
+│  │  getConfig()    │  │ reloadConfig()  │                  │
+│  │  (获取配置)      │  │  (重载配置)     │                  │
+│  └─────────────────┘  └─────────────────┘                  │
+├─────────────────────────────────────────────────────────────┤
+│                      Configuration File                      │
+│              .vscode/autotest-config.json                    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 2.2 配置文件查找策略
+
+模块按以下顺序查找配置文件：
+
+1. `{workspace}/.vscode/autotest-config.json` (优先)
+2. `{workspace}/autotest-config.json` (备选)
+
+### 2.3 自动创建机制
+
+当配置文件不存在时，模块会：
+1. 创建 `.vscode` 目录（如不存在）
+2. 生成包含默认值的配置文件
+3. 显示提示信息告知用户
+
+## 3. 类型定义
+
+### 3.1 完整配置结构
+
+```typescript
+interface AutoTestConfig {
+    server: ServerConfig;      // 服务器连接配置
+    command: CommandConfig;    // 命令执行配置
+    ai: AIConfig;              // AI 服务配置
+    logs: LogsConfig;          // 日志监控配置
+}
+```
+
+### 3.2 服务器配置
+
+```typescript
+interface ServerConfig {
+    host: string;              // 服务器主机地址，如 "192.168.1.100"
+    port: number;              // SSH 端口，默认 22
+    username: string;          // 登录用户名
+    password: string;          // 登录密码
+    uploadUrl: string;         // 文件上传接口 URL
+    executeCommand: string;    // 命令执行接口 URL
+    logDirectory: string;      // 服务器日志目录
+    downloadPath: string;      // 本地下载路径
+}
+```
+
+**字段说明**：
+
+| 字段 | 类型 | 必填 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| host | string | 是 | "192.168.1.100" | 目标服务器 IP 地址 |
+| port | number | 是 | 22 | SSH 连接端口 |
+| username | string | 是 | "root" | SSH 登录用户名 |
+| password | string | 否 | "" | SSH 登录密码 |
+| uploadUrl | string | 是 | - | 文件上传 API 地址 |
+| executeCommand | string | 是 | - | 命令执行 API 地址 |
+| logDirectory | string | 是 | "/var/logs" | 日志文件存储目录 |
+| downloadPath | string | 是 | "./downloads" | 日志下载本地路径 |
+
+### 3.3 命令配置
+
+```typescript
+interface CommandConfig {
+    executeCommand: string;              // 要执行的命令
+    filterPatterns: string[];            // 过滤正则表达式数组
+    filterMode: 'include' | 'exclude';   // 过滤模式
+}
+```
+
+**字段说明**：
+
+| 字段 | 类型 | 必填 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| executeCommand | string | 是 | "echo 'No command configured'" | 默认执行的命令 |
+| filterPatterns | string[] | 否 | [] | 正则表达式数组，用于过滤输出 |
+| filterMode | enum | 是 | "include" | include: 只保留匹配行；exclude: 排除匹配行 |
+
+**过滤模式示例**：
+
+```json
+{
+    "filterPatterns": ["\\[error\\]", "\\[warn\\]"],
+    "filterMode": "include"
+}
+```
+
+上述配置只显示包含 `[error]` 或 `[warn]` 的输出行。
+
+### 3.4 AI 配置
+
+```typescript
+interface AIConfig {
+    provider: 'qwen' | 'openai';  // AI 提供商
+    qwen: QWenConfig;             // 通义千问配置
+    openai: OpenAIConfig;         // OpenAI 配置
+}
+
+interface QWenConfig {
+    apiKey: string;               // API 密钥
+    apiUrl: string;               // API 地址
+    model: string;                // 模型名称
+}
+
+interface OpenAIConfig {
+    apiKey: string;               // API 密钥
+    apiUrl: string;               // API 地址
+    model: string;                // 模型名称
+}
+```
+
+**字段说明**：
+
+| 字段 | 类型 | 必填 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| provider | enum | 是 | "qwen" | 当前使用的 AI 提供商 |
+| qwen.apiKey | string | 是* | "" | 通义千问 API 密钥 |
+| qwen.apiUrl | string | 否 | 阿里云默认地址 | API 接口地址 |
+| qwen.model | string | 否 | "qwen-turbo" | 模型名称 |
+| openai.apiKey | string | 是* | "" | OpenAI API 密钥 |
+| openai.apiUrl | string | 否 | OpenAI 默认地址 | API 接口地址 |
+| openai.model | string | 否 | "gpt-3.5-turbo" | 模型名称 |
+
+*根据 provider 选择对应的 apiKey
+
+**支持的模型**：
+
+| 提供商 | 模型列表 |
+|--------|----------|
+| QWen | qwen-turbo, qwen-plus, qwen-max, qwen-max-longcontext |
+| OpenAI | gpt-3.5-turbo, gpt-3.5-turbo-16k, gpt-4, gpt-4-32k, gpt-4-turbo |
+
+### 3.5 日志配置
+
+```typescript
+interface LogsConfig {
+    monitorDirectory: string;     // 监控目录
+    downloadPath: string;         // 下载路径
+    refreshInterval: number;      // 刷新间隔(毫秒)
+}
+```
+
+**字段说明**：
+
+| 字段 | 类型 | 必填 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| monitorDirectory | string | 是 | "/var/logs" | 要监控的日志目录 |
+| downloadPath | string | 是 | "./downloads" | 日志下载保存路径 |
+| refreshInterval | number | 是 | 5000 | 自动刷新间隔，单位毫秒 |
+
+## 4. 功能实现
+
+### 4.1 核心函数
+
+#### loadConfig(workspacePath: string): AutoTestConfig
+
+加载配置文件，如不存在则创建默认配置。
+
+**参数**：
+- `workspacePath`: 工作区路径
+
+**返回值**：
+- `AutoTestConfig`: 配置对象
+
+**实现逻辑**：
+```
+1. 获取配置文件路径设置（默认 autotest-config.json）
+2. 按优先级查找配置文件
+3. 如果文件存在：
+   - 读取文件内容
+   - 解析 JSON
+   - 与默认配置合并
+4. 如果文件不存在：
+   - 创建 .vscode 目录
+   - 写入默认配置
+   - 显示提示信息
+5. 返回配置对象
+```
+
+#### getConfig(): AutoTestConfig
+
+获取当前已加载的配置。
+
+**返回值**：
+- `AutoTestConfig`: 当前配置对象
+
+**注意**：如未调用 loadConfig，返回默认配置。
+
+#### reloadConfig(workspacePath: string): AutoTestConfig
+
+重新加载配置文件。
+
+**参数**：
+- `workspacePath`: 工作区路径
+
+**返回值**：
+- `AutoTestConfig`: 重新加载后的配置对象
+
+### 4.2 默认配置
+
+```typescript
+const defaultConfig: AutoTestConfig = {
+    server: {
+        host: "192.168.1.100",
+        port: 22,
+        username: "root",
+        password: "",
+        uploadUrl: "http://192.168.1.100:8080/upload",
+        executeCommand: "http://192.168.1.100:8080/execute",
+        logDirectory: "/var/logs",
+        downloadPath: "./downloads"
+    },
+    command: {
+        executeCommand: "echo 'No command configured'",
+        filterPatterns: [],
+        filterMode: "include"
+    },
+    ai: {
+        provider: "qwen",
+        qwen: {
+            apiKey: "",
+            apiUrl: "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation",
+            model: "qwen-turbo"
+        },
+        openai: {
+            apiKey: "",
+            apiUrl: "https://api.openai.com/v1/chat/completions",
+            model: "gpt-3.5-turbo"
+        }
+    },
+    logs: {
+        monitorDirectory: "/var/logs",
+        downloadPath: "./downloads",
+        refreshInterval: 5000
+    }
+};
+```
+
+## 5. 使用示例
+
+### 5.1 加载配置
+
+```typescript
+import { loadConfig, getConfig } from './config';
+
+// 在扩展激活时加载配置
+export function activate(context: vscode.ExtensionContext) {
+    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (workspacePath) {
+        loadConfig(workspacePath);
+    }
+    
+    // 获取配置
+    const config = getConfig();
+    console.log('Server host:', config.server.host);
+}
+```
+
+### 5.2 重载配置
+
+```typescript
+import { reloadConfig } from './config';
+
+// 用户修改配置后重载
+function onConfigChanged() {
+    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (workspacePath) {
+        const newConfig = reloadConfig(workspacePath);
+        console.log('Config reloaded');
+    }
+}
+```
+
+### 5.3 配置文件示例
+
+```json
+{
+    "server": {
+        "host": "10.0.0.1",
+        "port": 22,
+        "username": "admin",
+        "password": "your-password",
+        "uploadUrl": "http://10.0.0.1:8080/api/upload",
+        "executeCommand": "http://10.0.0.1:8080/api/execute",
+        "logDirectory": "/var/log/myapp",
+        "downloadPath": "./logs"
+    },
+    "command": {
+        "executeCommand": "pytest tests/",
+        "filterPatterns": ["FAILED", "ERROR", "\\[error\\]"],
+        "filterMode": "include"
+    },
+    "ai": {
+        "provider": "openai",
+        "qwen": {
+            "apiKey": "",
+            "apiUrl": "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation",
+            "model": "qwen-max"
+        },
+        "openai": {
+            "apiKey": "sk-your-api-key",
+            "apiUrl": "https://api.openai.com/v1/chat/completions",
+            "model": "gpt-4"
+        }
+    },
+    "logs": {
+        "monitorDirectory": "/var/log/myapp",
+        "downloadPath": "./logs",
+        "refreshInterval": 3000
+    }
+}
+```
+
+## 6. 错误处理
+
+| 错误场景 | 处理方式 |
+|----------|----------|
+| 配置文件不存在 | 自动创建默认配置文件 |
+| JSON 解析失败 | 使用默认配置，记录错误日志 |
+| 文件读取权限不足 | 使用默认配置，显示错误提示 |
+| 配置项缺失 | 使用默认值填充缺失项 |
+
+## 7. 测试覆盖
+
+配置模块测试覆盖以下场景：
+
+- 默认配置验证
+- 配置值验证
+- 配置结构验证
+- 配置值修改测试
+- AI 模型配置测试
+
+详见测试文件：`test/suite/config.test.ts`

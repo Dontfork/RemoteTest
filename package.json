@@ -1,0 +1,106 @@
+{
+  "name": "autotest-plugin",
+  "displayName": "AutoTest",
+  "description": "VSCode插件，实现文件上传、命令执行、日志监控和AI对话功能",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "autotest-ai-chat",
+          "title": "AutoTest AI",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "autotest-ai-chat": [
+        {
+          "id": "autotest-ai-view",
+          "name": "AI 对话",
+          "type": "webview"
+        }
+      ],
+      "explorer": [
+        {
+          "id": "autotest-logs-view",
+          "name": "日志监控"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "autotest.uploadAndExecute",
+        "title": "AutoTest: 上传文件并执行命令"
+      },
+      {
+        "command": "autotest.monitorLogs",
+        "title": "AutoTest: 监控日志"
+      },
+      {
+        "command": "autotest.refreshLogs",
+        "title": "AutoTest: 刷新日志列表",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "autotest.downloadLog",
+        "title": "AutoTest: 下载日志文件"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "autotest.refreshLogs",
+          "when": "view == autotest-logs-view",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "autotest.downloadLog",
+          "when": "view == autotest-logs-view && viewItem == logFile",
+          "group": "inline"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "AutoTest",
+      "properties": {
+        "autotest.configPath": {
+          "type": "string",
+          "default": "autotest-config.json",
+          "description": "配置文件路径"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "test": "npm run compile && node ./out/test/runTest.js",
+    "test:unit": "mocha --require ts-node/register 'test/suite/*.test.ts'"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^18.19.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/test-electron": "^2.3.8",
+    "mocha": "^10.2.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "axios": "^1.6.5"
+  }
+}
