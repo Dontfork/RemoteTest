@@ -13,16 +13,12 @@ let logsTreeProvider: LogsTreeProvider;
 export function activate(context: vscode.ExtensionContext) {
     const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     
-    if (!workspacePath) {
-        vscode.window.showWarningMessage('请先打开一个工作区文件夹');
-        return;
-    }
-
-    loadConfig(workspacePath);
-
-    const config = getConfig();
-    if (!config.logs.monitorDirectory) {
-        config.logs.monitorDirectory = config.server.logDirectory || '/var/logs';
+    if (workspacePath) {
+        loadConfig(workspacePath);
+        const config = getConfig();
+        if (!config.logs.monitorDirectory) {
+            config.logs.monitorDirectory = config.server.logDirectory || '/var/logs';
+        }
     }
 
     commandExecutor = new CommandExecutor();
@@ -69,7 +65,10 @@ export function activate(context: vscode.ExtensionContext) {
         showCollapseAll: false
     });
 
-    const aiChatView = vscode.window.registerWebviewViewProvider('autotest-ai-view', new AIChatViewProvider(aiChat));
+    const aiChatView = vscode.window.registerWebviewViewProvider(
+        AIChatViewProvider.viewType, 
+        new AIChatViewProvider(context.extensionUri, aiChat)
+    );
 
     context.subscriptions.push(...commands, treeView, aiChatView);
 

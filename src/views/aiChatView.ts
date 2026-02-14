@@ -2,16 +2,28 @@ import * as vscode from 'vscode';
 import { AIChat } from '../ai';
 
 export class AIChatViewProvider implements vscode.WebviewViewProvider {
+    public static readonly viewType = 'autotest-ai-view';
     private aiChat: AIChat;
     private view: vscode.WebviewView | undefined;
+    private extensionUri: vscode.Uri;
 
-    constructor(aiChat: AIChat) {
+    constructor(extensionUri: vscode.Uri, aiChat: AIChat) {
+        this.extensionUri = extensionUri;
         this.aiChat = aiChat;
     }
 
-    resolveWebviewView(webviewView: vscode.WebviewView): void {
+    resolveWebviewView(
+        webviewView: vscode.WebviewView,
+        context: vscode.WebviewViewResolveContext,
+        token: vscode.CancellationToken
+    ): void {
         this.view = webviewView;
-        webviewView.webview.options = { enableScripts: true };
+        
+        webviewView.webview.options = {
+            enableScripts: true,
+            localResourceRoots: [this.extensionUri]
+        };
+        
         webviewView.webview.html = this.getHtmlContent();
 
         webviewView.webview.onDidReceiveMessage(async (message) => {
