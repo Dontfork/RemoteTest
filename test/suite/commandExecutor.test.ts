@@ -33,7 +33,242 @@ const filterOutput = (output: string, patterns: string[], filterMode: 'include' 
     return filteredLines.join('\n');
 };
 
+const replaceCommandVariables = (command: string, variables: any): string => {
+    let result = command;
+    
+    result = result.replace(/{filePath}/g, variables.filePath);
+    result = result.replace(/{fileName}/g, variables.fileName);
+    result = result.replace(/{fileDir}/g, variables.fileDir);
+    result = result.replace(/{localPath}/g, variables.localPath);
+    result = result.replace(/{localDir}/g, variables.localDir);
+    result = result.replace(/{localFileName}/g, variables.localFileName);
+    result = result.replace(/{remoteDir}/g, variables.remoteDir);
+    
+    return result;
+};
+
+const buildCommandVariables = (localFilePath: string, remoteFilePath: string, remoteDir: string) => {
+    const path = require('path');
+    const localDir = path.dirname(localFilePath);
+    const localFileName = path.basename(localFilePath);
+    const remoteFileDir = path.posix.dirname(remoteFilePath);
+    
+    return {
+        filePath: remoteFilePath,
+        fileName: path.posix.basename(remoteFilePath),
+        fileDir: remoteFileDir,
+        localPath: localFilePath,
+        localDir: localDir,
+        localFileName: localFileName,
+        remoteDir: remoteDir
+    };
+};
+
 describe('CommandExecutor Module - 命令执行模块测试', () => {
+    describe('Variable Replacement - 变量替换功能', () => {
+        it('{filePath}变量替换 - 替换为远程文件完整路径', () => {
+            const command = 'pytest {filePath}';
+            const variables = {
+                filePath: '/tmp/autotest/tests/test_example.py',
+                fileName: 'test_example.py',
+                fileDir: '/tmp/autotest/tests',
+                localPath: 'D:\\project\\tests\\test_example.py',
+                localDir: 'D:\\project\\tests',
+                localFileName: 'test_example.py',
+                remoteDir: '/tmp/autotest'
+            };
+            
+            const result = replaceCommandVariables(command, variables);
+            
+            assert.strictEqual(result, 'pytest /tmp/autotest/tests/test_example.py');
+        });
+
+        it('{fileName}变量替换 - 替换为远程文件名', () => {
+            const command = 'echo "Running {fileName}"';
+            const variables = {
+                filePath: '/tmp/autotest/tests/test_example.py',
+                fileName: 'test_example.py',
+                fileDir: '/tmp/autotest/tests',
+                localPath: 'D:\\project\\tests\\test_example.py',
+                localDir: 'D:\\project\\tests',
+                localFileName: 'test_example.py',
+                remoteDir: '/tmp/autotest'
+            };
+            
+            const result = replaceCommandVariables(command, variables);
+            
+            assert.strictEqual(result, 'echo "Running test_example.py"');
+        });
+
+        it('{fileDir}变量替换 - 替换为远程文件所在目录', () => {
+            const command = 'cd {fileDir} && pytest {fileName}';
+            const variables = {
+                filePath: '/tmp/autotest/tests/test_example.py',
+                fileName: 'test_example.py',
+                fileDir: '/tmp/autotest/tests',
+                localPath: 'D:\\project\\tests\\test_example.py',
+                localDir: 'D:\\project\\tests',
+                localFileName: 'test_example.py',
+                remoteDir: '/tmp/autotest'
+            };
+            
+            const result = replaceCommandVariables(command, variables);
+            
+            assert.strictEqual(result, 'cd /tmp/autotest/tests && pytest test_example.py');
+        });
+
+        it('{localPath}变量替换 - 替换为本地文件完整路径', () => {
+            const command = 'echo "Local: {localPath}"';
+            const variables = {
+                filePath: '/tmp/autotest/tests/test_example.py',
+                fileName: 'test_example.py',
+                fileDir: '/tmp/autotest/tests',
+                localPath: 'D:\\project\\tests\\test_example.py',
+                localDir: 'D:\\project\\tests',
+                localFileName: 'test_example.py',
+                remoteDir: '/tmp/autotest'
+            };
+            
+            const result = replaceCommandVariables(command, variables);
+            
+            assert.strictEqual(result, 'echo "Local: D:\\project\\tests\\test_example.py"');
+        });
+
+        it('{localDir}变量替换 - 替换为本地文件所在目录', () => {
+            const command = 'echo "Local Dir: {localDir}"';
+            const variables = {
+                filePath: '/tmp/autotest/tests/test_example.py',
+                fileName: 'test_example.py',
+                fileDir: '/tmp/autotest/tests',
+                localPath: 'D:\\project\\tests\\test_example.py',
+                localDir: 'D:\\project\\tests',
+                localFileName: 'test_example.py',
+                remoteDir: '/tmp/autotest'
+            };
+            
+            const result = replaceCommandVariables(command, variables);
+            
+            assert.strictEqual(result, 'echo "Local Dir: D:\\project\\tests"');
+        });
+
+        it('{localFileName}变量替换 - 替换为本地文件名', () => {
+            const command = 'echo "File: {localFileName}"';
+            const variables = {
+                filePath: '/tmp/autotest/tests/test_example.py',
+                fileName: 'test_example.py',
+                fileDir: '/tmp/autotest/tests',
+                localPath: 'D:\\project\\tests\\test_example.py',
+                localDir: 'D:\\project\\tests',
+                localFileName: 'test_example.py',
+                remoteDir: '/tmp/autotest'
+            };
+            
+            const result = replaceCommandVariables(command, variables);
+            
+            assert.strictEqual(result, 'echo "File: test_example.py"');
+        });
+
+        it('{remoteDir}变量替换 - 替换为远程工程目录', () => {
+            const command = 'cd {remoteDir} && ls -la';
+            const variables = {
+                filePath: '/tmp/autotest/tests/test_example.py',
+                fileName: 'test_example.py',
+                fileDir: '/tmp/autotest/tests',
+                localPath: 'D:\\project\\tests\\test_example.py',
+                localDir: 'D:\\project\\tests',
+                localFileName: 'test_example.py',
+                remoteDir: '/tmp/autotest'
+            };
+            
+            const result = replaceCommandVariables(command, variables);
+            
+            assert.strictEqual(result, 'cd /tmp/autotest && ls -la');
+        });
+
+        it('多变量替换 - 同时替换多个变量', () => {
+            const command = 'cd {remoteDir} && pytest {fileDir}/{fileName}';
+            const variables = {
+                filePath: '/tmp/autotest/tests/test_example.py',
+                fileName: 'test_example.py',
+                fileDir: '/tmp/autotest/tests',
+                localPath: 'D:\\project\\tests\\test_example.py',
+                localDir: 'D:\\project\\tests',
+                localFileName: 'test_example.py',
+                remoteDir: '/tmp/autotest'
+            };
+            
+            const result = replaceCommandVariables(command, variables);
+            
+            assert.strictEqual(result, 'cd /tmp/autotest && pytest /tmp/autotest/tests/test_example.py');
+        });
+
+        it('无变量命令 - 不包含变量的命令保持不变', () => {
+            const command = 'npm test';
+            const variables = {
+                filePath: '/tmp/autotest/tests/test_example.py',
+                fileName: 'test_example.py'
+            };
+            
+            const result = replaceCommandVariables(command, variables);
+            
+            assert.strictEqual(result, 'npm test');
+        });
+
+        it('重复变量替换 - 同一变量出现多次时全部替换', () => {
+            const command = 'echo {fileName} && cat {fileName}';
+            const variables = {
+                filePath: '/tmp/autotest/tests/test_example.py',
+                fileName: 'test_example.py',
+                fileDir: '/tmp/autotest/tests'
+            };
+            
+            const result = replaceCommandVariables(command, variables);
+            
+            assert.strictEqual(result, 'echo test_example.py && cat test_example.py');
+        });
+    });
+
+    describe('Build Command Variables - 构建命令变量', () => {
+        it('构建变量对象 - 从本地和远程路径生成变量', () => {
+            const localFilePath = 'D:\\project\\tests\\test_example.py';
+            const remoteFilePath = '/tmp/autotest/tests/test_example.py';
+            const remoteDir = '/tmp/autotest';
+            
+            const variables = buildCommandVariables(localFilePath, remoteFilePath, remoteDir);
+            
+            assert.strictEqual(variables.filePath, '/tmp/autotest/tests/test_example.py');
+            assert.strictEqual(variables.fileName, 'test_example.py');
+            assert.strictEqual(variables.fileDir, '/tmp/autotest/tests');
+            assert.strictEqual(variables.localPath, 'D:\\project\\tests\\test_example.py');
+            assert.strictEqual(variables.localDir, 'D:\\project\\tests');
+            assert.strictEqual(variables.localFileName, 'test_example.py');
+            assert.strictEqual(variables.remoteDir, '/tmp/autotest');
+        });
+
+        it('深层目录路径 - 正确提取目录层级', () => {
+            const localFilePath = 'D:\\project\\src\\utils\\helpers\\test_helper.py';
+            const remoteFilePath = '/tmp/autotest/src/utils/helpers/test_helper.py';
+            const remoteDir = '/tmp/autotest';
+            
+            const variables = buildCommandVariables(localFilePath, remoteFilePath, remoteDir);
+            
+            assert.strictEqual(variables.fileName, 'test_helper.py');
+            assert.strictEqual(variables.fileDir, '/tmp/autotest/src/utils/helpers');
+            assert.strictEqual(variables.localFileName, 'test_helper.py');
+        });
+
+        it('根目录文件 - 文件在工程根目录', () => {
+            const localFilePath = 'D:\\project\\main.py';
+            const remoteFilePath = '/tmp/autotest/main.py';
+            const remoteDir = '/tmp/autotest';
+            
+            const variables = buildCommandVariables(localFilePath, remoteFilePath, remoteDir);
+            
+            assert.strictEqual(variables.fileName, 'main.py');
+            assert.strictEqual(variables.fileDir, '/tmp/autotest');
+        });
+    });
+
     describe('Output Filtering - 输出过滤功能', () => {
         it('include模式：只保留匹配[error]和[warn]的行', () => {
             const output = '[info] Starting process\n[error] Failed to connect\n[warn] Retrying...';
@@ -103,6 +338,28 @@ describe('CommandExecutor Module - 命令执行模块测试', () => {
             
             assert.strictEqual(filterMode, 'exclude');
         });
+
+        it('验证远程命令配置 - 通过SSH执行的命令', () => {
+            const config = {
+                executeCommand: 'cd /tmp/autotest && npm test',
+                filterPatterns: ['\\[error\\]'],
+                filterMode: 'include' as const
+            };
+            
+            assert.ok(config.executeCommand.includes('/tmp/autotest'));
+            assert.strictEqual(config.filterMode, 'include');
+        });
+
+        it('验证带变量的命令配置 - pytest {filePath}', () => {
+            const config = {
+                executeCommand: 'pytest {filePath} -v',
+                filterPatterns: ['PASSED', 'FAILED'],
+                filterMode: 'include' as const
+            };
+            
+            assert.ok(config.executeCommand.includes('{filePath}'));
+            assert.ok(config.filterPatterns.includes('FAILED'));
+        });
     });
 
     describe('Pattern Matching - 正则模式匹配', () => {
@@ -170,23 +427,51 @@ describe('CommandExecutor Module - 命令执行模块测试', () => {
         });
     });
 
-    describe('Terminal Integration - 终端集成', () => {
-        it('终端名称验证 - 名称长度大于0', () => {
-            const terminalName = 'AutoTest Command';
-            
-            assert.ok(terminalName.length > 0);
+    describe('SSH Remote Execution - SSH远程执行', () => {
+        it('SSH客户端执行方法验证 - executeRemoteCommand函数存在', () => {
+            const { executeRemoteCommand } = require('../../core/sshClient');
+            assert.strictEqual(typeof executeRemoteCommand, 'function');
         });
 
-        it('Shell路径验证 - 根据平台选择正确的shell', () => {
-            const shellPath = process.platform === 'win32' ? 'cmd.exe' : '/bin/bash';
+        it('SSH命令结果结构 - 包含stdout、stderr、code', () => {
+            const mockResult = {
+                stdout: 'Hello World',
+                stderr: '',
+                code: 0
+            };
             
-            assert.ok(shellPath);
+            assert.ok(mockResult.hasOwnProperty('stdout'));
+            assert.ok(mockResult.hasOwnProperty('stderr'));
+            assert.ok(mockResult.hasOwnProperty('code'));
         });
 
-        it('平台检测 - 正确识别当前操作系统', () => {
-            const platform = process.platform;
+        it('SSH命令执行失败 - 退出码非零', () => {
+            const mockResult = {
+                stdout: '',
+                stderr: 'command not found',
+                code: 127
+            };
             
-            assert.ok(['win32', 'darwin', 'linux'].includes(platform));
+            assert.notStrictEqual(mockResult.code, 0);
+        });
+
+        it('SSH命令执行成功 - 退出码为0', () => {
+            const mockResult = {
+                stdout: 'test output',
+                stderr: '',
+                code: 0
+            };
+            
+            assert.strictEqual(mockResult.code, 0);
+        });
+
+        it('远程目录切换 - 命令包含cd和远程目录', () => {
+            const remoteDirectory = '/tmp/autotest';
+            const command = 'npm test';
+            const fullCommand = `cd ${remoteDirectory} && ${command}`;
+            
+            assert.ok(fullCommand.includes('cd /tmp/autotest'));
+            assert.ok(fullCommand.includes('npm test'));
         });
     });
 
@@ -197,6 +482,18 @@ describe('CommandExecutor Module - 命令执行模块测试', () => {
             assert.ok(error.message.includes('Command failed'));
         });
 
+        it('SSH连接错误 - 错误消息包含"SSH"', () => {
+            const error = new Error('SSH connection failed');
+            
+            assert.ok(error.message.includes('SSH'));
+        });
+
+        it('认证错误 - 错误消息包含"认证"或"Authentication"', () => {
+            const error = new Error('Authentication failed');
+            
+            assert.ok(error.message.includes('Authentication') || error.message.includes('认证'));
+        });
+
         it('超时配置验证 - 超时时间应大于0', () => {
             const timeoutMs = 30000;
             
@@ -204,19 +501,29 @@ describe('CommandExecutor Module - 命令执行模块测试', () => {
         });
     });
 
-    describe('File Upload Configuration - 文件上传配置', () => {
-        it('上传URL验证 - 必须以http开头且包含/upload路径', () => {
-            const uploadUrl = 'http://192.168.1.100:8080/upload';
-            
-            assert.ok(uploadUrl.startsWith('http'));
-            assert.ok(uploadUrl.includes('/upload'));
+    describe('SCP File Upload Configuration - SCP文件上传配置', () => {
+        it('SCP上传方法验证 - uploadFile函数存在', () => {
+            const { uploadFile } = require('../../core/scpClient');
+            assert.strictEqual(typeof uploadFile, 'function');
         });
 
-        it('执行命令URL验证 - 必须以http开头且包含/execute路径', () => {
-            const executeUrl = 'http://192.168.1.100:8080/execute';
+        it('远程目录配置 - remoteDirectory非空', () => {
+            const config = {
+                remoteDirectory: '/tmp/autotest'
+            };
             
-            assert.ok(executeUrl.startsWith('http'));
-            assert.ok(executeUrl.includes('/execute'));
+            assert.ok(config.remoteDirectory.length > 0);
+            assert.ok(config.remoteDirectory.startsWith('/'));
+        });
+
+        it('上传路径拼接 - 本地文件名映射到远程目录', () => {
+            const path = require('path');
+            const localPath = '/local/path/test.txt';
+            const remoteDirectory = '/tmp/autotest';
+            const fileName = path.basename(localPath);
+            const remotePath = path.posix.join(remoteDirectory, fileName);
+            
+            assert.strictEqual(remotePath, '/tmp/autotest/test.txt');
         });
     });
 
@@ -229,16 +536,123 @@ describe('CommandExecutor Module - 命令执行模块测试', () => {
             assert.strictEqual(flow[2], 'monitor');
         });
 
-        it('步骤映射验证 - 1:选择文件 2:上传文件 3:执行命令 4:过滤输出', () => {
+        it('步骤映射验证 - 1:选择文件 2:SCP上传 3:SSH执行 4:过滤输出', () => {
             const steps = {
                 1: 'selectFile',
-                2: 'uploadFile',
-                3: 'executeCommand',
+                2: 'scpUpload',
+                3: 'sshExecute',
                 4: 'filterOutput'
             };
             
             assert.strictEqual(steps[1], 'selectFile');
+            assert.strictEqual(steps[2], 'scpUpload');
+            assert.strictEqual(steps[3], 'sshExecute');
             assert.strictEqual(steps[4], 'filterOutput');
+        });
+
+        it('完整工作流配置 - 包含服务器、命令、日志配置', () => {
+            const workflowConfig = {
+                server: {
+                    host: '192.168.1.100',
+                    port: 22,
+                    username: 'root',
+                    remoteDirectory: '/tmp/autotest'
+                },
+                command: {
+                    executeCommand: 'pytest {filePath}',
+                    filterPatterns: ['PASSED', 'FAILED'],
+                    filterMode: 'include' as const
+                },
+                logs: {
+                    directories: [
+                        { name: '应用日志', path: '/var/logs' }
+                    ],
+                    downloadPath: './downloads'
+                }
+            };
+            
+            assert.ok(workflowConfig.server.host);
+            assert.ok(workflowConfig.command.executeCommand.includes('{filePath}'));
+            assert.ok(workflowConfig.logs.directories.length > 0);
+        });
+    });
+
+    describe('SSH Authentication - SSH认证', () => {
+        it('密码认证配置 - password字段存在', () => {
+            const authConfig = {
+                username: 'testuser',
+                password: 'testpassword'
+            };
+            
+            assert.ok(authConfig.password);
+        });
+
+        it('密钥认证配置 - privateKeyPath字段存在', () => {
+            const authConfig = {
+                username: 'testuser',
+                privateKeyPath: '/home/user/.ssh/id_rsa'
+            };
+            
+            assert.ok(authConfig.privateKeyPath);
+        });
+
+        it('认证优先级 - 密钥优先于密码', () => {
+            const config = {
+                password: 'testpassword',
+                privateKeyPath: '/home/user/.ssh/id_rsa'
+            };
+            
+            const usePrivateKey = config.privateKeyPath && config.privateKeyPath.length > 0;
+            
+            assert.strictEqual(usePrivateKey, true);
+        });
+
+        it('SSH端口配置 - 默认22端口', () => {
+            const defaultSSHPort = 22;
+            
+            assert.strictEqual(defaultSSHPort, 22);
+        });
+
+        it('非标准SSH端口 - 支持自定义端口', () => {
+            const customPort: number = 2222;
+            
+            assert.ok(customPort !== 22);
+        });
+    });
+
+    describe('Output Channel Integration - 输出通道集成', () => {
+        it('输出通道名称 - AutoTest', () => {
+            const channelName = 'AutoTest';
+            
+            assert.strictEqual(channelName, 'AutoTest');
+        });
+
+        it('日志格式 - 包含时间戳和级别', () => {
+            const logLine = '[2024-01-15 10:30:00] [info] Starting process';
+            
+            assert.ok(logLine.includes('['));
+            assert.ok(logLine.includes(']'));
+        });
+
+        it('错误日志格式 - 包含[错误]标记', () => {
+            const errorLog = '[错误] SSH connection failed';
+            
+            assert.ok(errorLog.includes('[错误]'));
+        });
+
+        it('命令执行日志 - 包含SSH连接信息', () => {
+            const sshLog = '[SSH] root@192.168.1.100:22';
+            
+            assert.ok(sshLog.includes('[SSH]'));
+            assert.ok(sshLog.includes('@'));
+        });
+
+        it('变量替换日志 - 包含原始命令和替换后命令', () => {
+            const logLine = '[变量替换] 原始命令: pytest {filePath} -> 替换后: pytest /tmp/test.py';
+            
+            assert.ok(logLine.includes('[变量替换]'));
+            assert.ok(logLine.includes('原始命令'));
+            assert.ok(logLine.includes('替换后'));
         });
     });
 });

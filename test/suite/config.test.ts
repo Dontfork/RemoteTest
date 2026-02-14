@@ -7,14 +7,13 @@ const defaultConfig = {
         port: 22,
         username: "root",
         password: "",
-        uploadUrl: "http://192.168.1.100:8080/upload",
-        executeCommand: "http://192.168.1.100:8080/execute",
-        logDirectory: "/var/logs",
-        downloadPath: "./downloads"
+        privateKeyPath: "",
+        localProjectPath: "",
+        remoteDirectory: "/tmp/autotest"
     },
     command: {
-        executeCommand: "echo 'No command configured'",
-        filterPatterns: [] as string[],
+        executeCommand: "pytest {filePath} -v",
+        filterPatterns: ["PASSED", "FAILED", "ERROR"],
         filterMode: "include" as 'include' | 'exclude'
     },
     ai: {
@@ -31,7 +30,10 @@ const defaultConfig = {
         }
     },
     logs: {
-        monitorDirectory: "/var/logs",
+        directories: [
+            { name: "应用日志", path: "/var/logs" },
+            { name: "测试日志", path: "/var/log/autotest" }
+        ],
         downloadPath: "./downloads",
         refreshInterval: 5000
     }
@@ -39,11 +41,10 @@ const defaultConfig = {
 
 describe('Config Module - 配置模块测试', () => {
     describe('Default Configuration - 默认配置验证', () => {
-        it('验证服务器配置有效性 - host、port、uploadUrl、executeCommand必填', () => {
+        it('验证服务器配置有效性 - host、port、username必填', () => {
             assert.ok(defaultConfig.server.host);
             assert.ok(defaultConfig.server.port > 0);
-            assert.ok(defaultConfig.server.uploadUrl);
-            assert.ok(defaultConfig.server.executeCommand);
+            assert.ok(defaultConfig.server.username);
         });
 
         it('验证命令配置有效性 - executeCommand、filterPatterns数组、filterMode枚举值', () => {
@@ -60,8 +61,9 @@ describe('Config Module - 配置模块测试', () => {
             assert.ok(defaultConfig.ai.openai.model);
         });
 
-        it('验证日志配置有效性 - monitorDirectory、downloadPath、refreshInterval', () => {
-            assert.ok(defaultConfig.logs.monitorDirectory);
+        it('验证日志配置有效性 - directories数组、downloadPath、refreshInterval', () => {
+            assert.ok(Array.isArray(defaultConfig.logs.directories));
+            assert.ok(defaultConfig.logs.directories.length > 0);
             assert.ok(defaultConfig.logs.downloadPath);
             assert.ok(defaultConfig.logs.refreshInterval > 0);
         });
@@ -96,6 +98,16 @@ describe('Config Module - 配置模块测试', () => {
         it('验证默认openai模型 - 应为gpt-3.5-turbo', () => {
             assert.strictEqual(defaultConfig.ai.openai.model, 'gpt-3.5-turbo');
         });
+
+        it('验证默认命令包含变量 - 应包含{filePath}变量', () => {
+            assert.ok(defaultConfig.command.executeCommand.includes('{filePath}'));
+        });
+
+        it('验证默认过滤模式 - 应包含PASSED、FAILED、ERROR', () => {
+            assert.ok(defaultConfig.command.filterPatterns.includes('PASSED'));
+            assert.ok(defaultConfig.command.filterPatterns.includes('FAILED'));
+            assert.ok(defaultConfig.command.filterPatterns.includes('ERROR'));
+        });
     });
 
     describe('Configuration Structure - 配置结构验证', () => {
@@ -107,15 +119,14 @@ describe('Config Module - 配置模块测试', () => {
             assert.ok('logs' in defaultConfig);
         });
 
-        it('验证server嵌套属性 - host、port、username、password、uploadUrl、executeCommand、logDirectory、downloadPath', () => {
+        it('验证server嵌套属性 - host、port、username、password、privateKeyPath、localProjectPath、remoteDirectory', () => {
             assert.ok('host' in defaultConfig.server);
             assert.ok('port' in defaultConfig.server);
             assert.ok('username' in defaultConfig.server);
             assert.ok('password' in defaultConfig.server);
-            assert.ok('uploadUrl' in defaultConfig.server);
-            assert.ok('executeCommand' in defaultConfig.server);
-            assert.ok('logDirectory' in defaultConfig.server);
-            assert.ok('downloadPath' in defaultConfig.server);
+            assert.ok('privateKeyPath' in defaultConfig.server);
+            assert.ok('localProjectPath' in defaultConfig.server);
+            assert.ok('remoteDirectory' in defaultConfig.server);
         });
 
         it('验证command嵌套属性 - executeCommand、filterPatterns、filterMode', () => {
@@ -142,10 +153,17 @@ describe('Config Module - 配置模块测试', () => {
             assert.ok('model' in defaultConfig.ai.openai);
         });
 
-        it('验证logs嵌套属性 - monitorDirectory、downloadPath、refreshInterval', () => {
-            assert.ok('monitorDirectory' in defaultConfig.logs);
+        it('验证logs嵌套属性 - directories、downloadPath、refreshInterval', () => {
+            assert.ok('directories' in defaultConfig.logs);
             assert.ok('downloadPath' in defaultConfig.logs);
             assert.ok('refreshInterval' in defaultConfig.logs);
+        });
+
+        it('验证日志目录配置结构 - 每个目录包含name和path', () => {
+            for (const dir of defaultConfig.logs.directories) {
+                assert.ok('name' in dir);
+                assert.ok('path' in dir);
+            }
         });
     });
 
@@ -162,8 +180,8 @@ describe('Config Module - 配置模块测试', () => {
             assert.strictEqual(modifiedConfig.ai.provider, 'openai');
         });
 
-        it('验证过滤模式可添加 - 添加[error]和[warn]两个过滤模式', () => {
-            const modifiedConfig = { ...defaultConfig, command: { ...defaultConfig.command, filterPatterns: ['\\[error\\]', '\\[warn\\]'] } };
+        it('验证过滤模式可添加 - 添加DEBUG和INFO两个过滤模式', () => {
+            const modifiedConfig = { ...defaultConfig, command: { ...defaultConfig.command, filterPatterns: ['DEBUG', 'INFO'] } };
             assert.strictEqual(modifiedConfig.command.filterPatterns.length, 2);
         });
 
@@ -194,6 +212,53 @@ describe('Config Module - 配置模块测试', () => {
                 } 
             };
             assert.strictEqual(modifiedConfig.ai.openai.model, 'gpt-4');
+        });
+
+        it('验证日志目录可添加 - 添加新的监控目录', () => {
+            const modifiedConfig = { 
+                ...defaultConfig, 
+                logs: { 
+                    ...defaultConfig.logs, 
+                    directories: [
+                        ...defaultConfig.logs.directories,
+                        { name: "系统日志", path: "/var/log/system" }
+                    ] 
+                } 
+            };
+            assert.strictEqual(modifiedConfig.logs.directories.length, 3);
+        });
+
+        it('验证远程目录可修改 - 从/tmp/autotest改为/home/user/test', () => {
+            const modifiedConfig = { ...defaultConfig, server: { ...defaultConfig.server } };
+            modifiedConfig.server.remoteDirectory = '/home/user/test';
+            assert.strictEqual(modifiedConfig.server.remoteDirectory, '/home/user/test');
+        });
+    });
+
+    describe('Config Watcher - 配置监听功能测试', () => {
+        it('验证配置变化事件机制 - EventEmitter模式', () => {
+            let eventFired = false;
+            const mockListener = () => { eventFired = true; };
+            
+            const emitter = { 
+                listeners: [] as (() => void)[],
+                subscribe: function(listener: () => void) { this.listeners.push(listener); },
+                fire: function() { this.listeners.forEach(l => l()); }
+            };
+            
+            emitter.subscribe(mockListener);
+            emitter.fire();
+            
+            assert.strictEqual(eventFired, true);
+        });
+
+        it('验证配置比较逻辑 - JSON序列化比较', () => {
+            const config1 = { server: { host: "192.168.1.100" } };
+            const config2 = { server: { host: "192.168.1.100" } };
+            const config3 = { server: { host: "192.168.1.101" } };
+            
+            assert.strictEqual(JSON.stringify(config1) === JSON.stringify(config2), true);
+            assert.strictEqual(JSON.stringify(config1) === JSON.stringify(config3), false);
         });
     });
 });

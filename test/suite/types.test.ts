@@ -1,21 +1,31 @@
 import * as assert from 'assert';
 import { describe, it } from 'mocha';
+import * as path from 'path';
 
 interface ServerConfig {
     host: string;
     port: number;
     username: string;
     password: string;
-    uploadUrl: string;
-    executeCommand: string;
-    logDirectory: string;
-    downloadPath: string;
+    privateKeyPath: string;
+    localProjectPath: string;
+    remoteDirectory: string;
 }
 
 interface CommandConfig {
     executeCommand: string;
     filterPatterns: string[];
     filterMode: 'include' | 'exclude';
+}
+
+interface CommandVariables {
+    filePath: string;
+    fileName: string;
+    fileDir: string;
+    localPath: string;
+    localDir: string;
+    localFileName: string;
+    remoteDir: string;
 }
 
 interface QWenConfig {
@@ -36,8 +46,13 @@ interface AIConfig {
     openai: OpenAIConfig;
 }
 
+interface LogDirectoryConfig {
+    name: string;
+    path: string;
+}
+
 interface LogsConfig {
-    monitorDirectory: string;
+    directories: LogDirectoryConfig[];
     downloadPath: string;
     refreshInterval: number;
 }
@@ -64,26 +79,144 @@ interface LogFile {
     path: string;
     size: number;
     modifiedTime: Date;
+    isDirectory: boolean;
 }
 
 describe('Types Module - 类型定义模块测试', () => {
     describe('ServerConfig - 服务器配置接口', () => {
-        it('验证ServerConfig接口包含所有必需属性', () => {
+        it('验证ServerConfig接口包含所有必需属性 - SSH/SCP配置', () => {
             const config: ServerConfig = {
                 host: '192.168.1.100',
                 port: 22,
                 username: 'root',
                 password: 'password',
-                uploadUrl: 'http://192.168.1.100:8080/upload',
-                executeCommand: 'http://192.168.1.100:8080/execute',
-                logDirectory: '/var/logs',
-                downloadPath: './downloads'
+                privateKeyPath: '',
+                localProjectPath: '',
+                remoteDirectory: '/tmp/autotest'
             };
             
             assert.strictEqual(config.host, '192.168.1.100');
             assert.strictEqual(config.port, 22);
             assert.strictEqual(config.username, 'root');
-            assert.strictEqual(config.uploadUrl, 'http://192.168.1.100:8080/upload');
+            assert.strictEqual(config.remoteDirectory, '/tmp/autotest');
+        });
+
+        it('验证SSH密码认证配置 - 使用password进行认证', () => {
+            const config: ServerConfig = {
+                host: '192.168.1.100',
+                port: 22,
+                username: 'testuser',
+                password: 'mypassword',
+                privateKeyPath: '',
+                localProjectPath: '',
+                remoteDirectory: '/home/testuser/autotest'
+            };
+            
+            assert.strictEqual(config.password, 'mypassword');
+            assert.strictEqual(config.privateKeyPath, '');
+        });
+
+        it('验证SSH密钥认证配置 - 使用privateKeyPath进行认证', () => {
+            const config: ServerConfig = {
+                host: '192.168.1.100',
+                port: 22,
+                username: 'root',
+                password: '',
+                privateKeyPath: '/home/user/.ssh/id_rsa',
+                localProjectPath: '',
+                remoteDirectory: '/tmp/autotest'
+            };
+            
+            assert.strictEqual(config.privateKeyPath, '/home/user/.ssh/id_rsa');
+            assert.strictEqual(config.password, '');
+        });
+
+        it('验证SSH端口配置 - 支持非标准SSH端口', () => {
+            const config: ServerConfig = {
+                host: '192.168.1.100',
+                port: 2222,
+                username: 'root',
+                password: 'password',
+                privateKeyPath: '',
+                localProjectPath: '',
+                remoteDirectory: '/tmp/autotest'
+            };
+            
+            assert.strictEqual(config.port, 2222);
+        });
+
+        it('验证本地工程路径配置 - localProjectPath用于路径映射', () => {
+            const config: ServerConfig = {
+                host: '192.168.1.100',
+                port: 22,
+                username: 'root',
+                password: 'password',
+                privateKeyPath: '',
+                localProjectPath: 'D:\\Projects\\Test',
+                remoteDirectory: '/home/user/test'
+            };
+            
+            assert.strictEqual(config.localProjectPath, 'D:\\Projects\\Test');
+        });
+
+        it('验证ServerConfig不包含logDirectory和downloadPath - 已移至logs配置', () => {
+            const config: ServerConfig = {
+                host: '192.168.1.100',
+                port: 22,
+                username: 'root',
+                password: 'password',
+                privateKeyPath: '',
+                localProjectPath: '',
+                remoteDirectory: '/tmp/autotest'
+            };
+            
+            assert.strictEqual(Object.keys(config).includes('logDirectory'), false);
+            assert.strictEqual(Object.keys(config).includes('downloadPath'), false);
+        });
+    });
+
+    describe('路径映射逻辑 - 本地到远程路径转换', () => {
+        it('验证相对路径计算 - 本地文件映射到远程对应路径', () => {
+            const localProjectPath = 'D:\\Projects\\Test';
+            const remoteDirectory = '/home/user/test';
+            const localFilePath = 'D:\\Projects\\Test\\src\\utils\\helper.js';
+            
+            const relativePath = path.relative(localProjectPath, localFilePath);
+            const posixRelativePath = relativePath.split(path.sep).join(path.posix.sep);
+            const remotePath = path.posix.join(remoteDirectory, posixRelativePath);
+            
+            assert.strictEqual(remotePath, '/home/user/test/src/utils/helper.js');
+        });
+
+        it('验证深层目录路径映射 - 多层嵌套目录', () => {
+            const localProjectPath = '/home/user/project';
+            const remoteDirectory = '/opt/autotest';
+            const localFilePath = '/home/user/project/tests/unit/services/auth.test.js';
+            
+            const relativePath = path.relative(localProjectPath, localFilePath);
+            const posixRelativePath = relativePath.split(path.sep).join(path.posix.sep);
+            const remotePath = path.posix.join(remoteDirectory, posixRelativePath);
+            
+            assert.strictEqual(remotePath, '/opt/autotest/tests/unit/services/auth.test.js');
+        });
+
+        it('验证根目录文件映射 - 文件在工程根目录', () => {
+            const localProjectPath = '/home/user/project';
+            const remoteDirectory = '/opt/autotest';
+            const localFilePath = '/home/user/project/package.json';
+            
+            const relativePath = path.relative(localProjectPath, localFilePath);
+            const posixRelativePath = relativePath.split(path.sep).join(path.posix.sep);
+            const remotePath = path.posix.join(remoteDirectory, posixRelativePath);
+            
+            assert.strictEqual(remotePath, '/opt/autotest/package.json');
+        });
+
+        it('验证路径分隔符转换 - Windows路径转POSIX路径', () => {
+            const windowsPath = 'src\\utils\\helper.js';
+            const posixPath = windowsPath.split(path.sep).join(path.posix.sep);
+            
+            assert.strictEqual(posixPath, 'src/utils/helper.js');
         });
     });
 
@@ -107,6 +240,90 @@ describe('Types Module - 类型定义模块测试', () => {
             };
             
             assert.strictEqual(config.filterMode, 'exclude');
+        });
+
+        it('验证远程命令配置 - 通过SSH执行的命令', () => {
+            const config: CommandConfig = {
+                executeCommand: 'cd /tmp/autotest && npm test',
+                filterPatterns: ['\\[error\\]'],
+                filterMode: 'include'
+            };
+            
+            assert.ok(config.executeCommand.includes('/tmp/autotest'));
+            assert.strictEqual(config.filterMode, 'include');
+        });
+
+        it('验证带变量的命令配置 - 支持文件路径变量替换', () => {
+            const config: CommandConfig = {
+                executeCommand: 'pytest {filePath} -v',
+                filterPatterns: ['PASSED', 'FAILED'],
+                filterMode: 'include'
+            };
+            
+            assert.ok(config.executeCommand.includes('{filePath}'));
+            assert.ok(config.filterPatterns.includes('PASSED'));
+        });
+    });
+
+    describe('CommandVariables - 命令变量接口', () => {
+        it('验证CommandVariables接口包含所有变量 - 文件路径相关变量', () => {
+            const variables: CommandVariables = {
+                filePath: '/tmp/autotest/tests/test_example.py',
+                fileName: 'test_example.py',
+                fileDir: '/tmp/autotest/tests',
+                localPath: 'D:\\project\\tests\\test_example.py',
+                localDir: 'D:\\project\\tests',
+                localFileName: 'test_example.py',
+                remoteDir: '/tmp/autotest'
+            };
+            
+            assert.strictEqual(variables.filePath, '/tmp/autotest/tests/test_example.py');
+            assert.strictEqual(variables.fileName, 'test_example.py');
+            assert.strictEqual(variables.fileDir, '/tmp/autotest/tests');
+        });
+
+        it('验证远程路径变量 - filePath为远程文件完整路径', () => {
+            const variables: CommandVariables = {
+                filePath: '/home/user/project/src/main.py',
+                fileName: 'main.py',
+                fileDir: '/home/user/project/src',
+                localPath: 'C:\\dev\\project\\src\\main.py',
+                localDir: 'C:\\dev\\project\\src',
+                localFileName: 'main.py',
+                remoteDir: '/home/user/project'
+            };
+            
+            assert.ok(variables.filePath.startsWith('/'));
+            assert.ok(variables.filePath.endsWith('.py'));
+        });
+
+        it('验证本地路径变量 - localPath为本地文件完整路径', () => {
+            const variables: CommandVariables = {
+                filePath: '/tmp/test.py',
+                fileName: 'test.py',
+                fileDir: '/tmp',
+                localPath: 'D:\\workspace\\test.py',
+                localDir: 'D:\\workspace',
+                localFileName: 'test.py',
+                remoteDir: '/tmp'
+            };
+            
+            assert.ok(variables.localPath.includes('test.py'));
+            assert.strictEqual(variables.localDir, 'D:\\workspace');
+        });
+
+        it('验证远程工程目录变量 - remoteDir为配置的远程目录', () => {
+            const variables: CommandVariables = {
+                filePath: '/opt/autotest/tests/api/test_user.py',
+                fileName: 'test_user.py',
+                fileDir: '/opt/autotest/tests/api',
+                localPath: '/home/dev/project/tests/api/test_user.py',
+                localDir: '/home/dev/project/tests/api',
+                localFileName: 'test_user.py',
+                remoteDir: '/opt/autotest'
+            };
+            
+            assert.strictEqual(variables.remoteDir, '/opt/autotest');
         });
     });
 
@@ -177,15 +394,71 @@ describe('Types Module - 类型定义模块测试', () => {
     });
 
     describe('LogsConfig - 日志配置接口', () => {
-        it('验证日志配置属性 - 监控目录、下载路径、刷新间隔', () => {
+        it('验证日志目录列表配置 - 支持多个监控目录', () => {
             const config: LogsConfig = {
-                monitorDirectory: '/var/logs',
+                directories: [
+                    { name: '应用日志', path: '/var/logs' },
+                    { name: '测试日志', path: '/var/log/autotest' }
+                ],
                 downloadPath: './downloads',
                 refreshInterval: 5000
             };
             
-            assert.strictEqual(config.monitorDirectory, '/var/logs');
-            assert.strictEqual(config.refreshInterval, 5000);
+            assert.strictEqual(config.directories.length, 2);
+            assert.strictEqual(config.directories[0].name, '应用日志');
+            assert.strictEqual(config.directories[1].path, '/var/log/autotest');
+        });
+
+        it('验证日志下载路径配置 - 本地保存路径', () => {
+            const config: LogsConfig = {
+                directories: [{ name: '日志', path: '/var/logs' }],
+                downloadPath: './logs',
+                refreshInterval: 3000
+            };
+            
+            assert.strictEqual(config.downloadPath, './logs');
+            assert.strictEqual(config.refreshInterval, 3000);
+        });
+
+        it('验证LogDirectoryConfig结构 - 包含name和path', () => {
+            const dirConfig: LogDirectoryConfig = {
+                name: '系统日志',
+                path: '/var/log/system'
+            };
+            
+            assert.strictEqual(dirConfig.name, '系统日志');
+            assert.strictEqual(dirConfig.path, '/var/log/system');
+        });
+    });
+
+    describe('LogFile - 日志文件接口', () => {
+        it('验证日志文件对象 - 包含名称、路径、大小、修改时间、是否目录', () => {
+            const logFile: LogFile = {
+                name: 'app.log',
+                path: '/var/logs/app.log',
+                size: 1024,
+                modifiedTime: new Date('2024-01-15T10:30:00Z'),
+                isDirectory: false
+            };
+            
+            assert.strictEqual(logFile.name, 'app.log');
+            assert.strictEqual(logFile.path, '/var/logs/app.log');
+            assert.strictEqual(logFile.size, 1024);
+            assert.strictEqual(logFile.isDirectory, false);
+            assert.ok(logFile.modifiedTime instanceof Date);
+        });
+
+        it('验证日志目录对象 - isDirectory为true', () => {
+            const logDir: LogFile = {
+                name: 'subdir',
+                path: '/var/logs/subdir',
+                size: 4096,
+                modifiedTime: new Date('2024-01-15T10:30:00Z'),
+                isDirectory: true
+            };
+            
+            assert.strictEqual(logDir.isDirectory, true);
+            assert.strictEqual(logDir.name, 'subdir');
         });
     });
 
@@ -193,17 +466,16 @@ describe('Types Module - 类型定义模块测试', () => {
         it('验证完整配置结构 - 包含server、command、ai、logs四个子配置', () => {
             const config: AutoTestConfig = {
                 server: {
-                    host: 'localhost',
+                    host: '192.168.1.100',
                     port: 22,
                     username: 'root',
-                    password: '',
-                    uploadUrl: 'http://localhost:8080/upload',
-                    executeCommand: 'http://localhost:8080/execute',
-                    logDirectory: '/var/logs',
-                    downloadPath: './downloads'
+                    password: 'password',
+                    privateKeyPath: '',
+                    localProjectPath: '',
+                    remoteDirectory: '/tmp/autotest'
                 },
                 command: {
-                    executeCommand: 'echo test',
+                    executeCommand: 'npm test',
                     filterPatterns: [],
                     filterMode: 'include'
                 },
@@ -213,7 +485,7 @@ describe('Types Module - 类型定义模块测试', () => {
                     openai: { apiKey: '', apiUrl: '', model: 'gpt-3.5-turbo' }
                 },
                 logs: {
-                    monitorDirectory: '/var/logs',
+                    directories: [{ name: '日志', path: '/var/logs' }],
                     downloadPath: './downloads',
                     refreshInterval: 5000
                 }
@@ -223,6 +495,44 @@ describe('Types Module - 类型定义模块测试', () => {
             assert.ok(config.command);
             assert.ok(config.ai);
             assert.ok(config.logs);
+        });
+
+        it('验证SSH/SCP完整配置 - 使用密钥认证', () => {
+            const config: AutoTestConfig = {
+                server: {
+                    host: '192.168.1.200',
+                    port: 22,
+                    username: 'deploy',
+                    password: '',
+                    privateKeyPath: '/home/deploy/.ssh/id_rsa',
+                    localProjectPath: '/home/deploy/project',
+                    remoteDirectory: '/opt/autotest'
+                },
+                command: {
+                    executeCommand: 'cd /opt/autotest && ./run_tests.sh',
+                    filterPatterns: ['\\[error\\]', '\\[fail\\]'],
+                    filterMode: 'include'
+                },
+                ai: {
+                    provider: 'openai',
+                    qwen: { apiKey: '', apiUrl: '', model: 'qwen-turbo' },
+                    openai: { apiKey: 'sk-test', apiUrl: '', model: 'gpt-4' }
+                },
+                logs: {
+                    directories: [
+                        { name: '应用日志', path: '/var/log/autotest' },
+                        { name: '系统日志', path: '/var/log/system' }
+                    ],
+                    downloadPath: './logs',
+                    refreshInterval: 10000
+                }
+            };
+            
+            assert.strictEqual(config.server.privateKeyPath, '/home/deploy/.ssh/id_rsa');
+            assert.strictEqual(config.server.localProjectPath, '/home/deploy/project');
+            assert.strictEqual(config.server.remoteDirectory, '/opt/autotest');
+            assert.strictEqual(config.logs.directories.length, 2);
+            assert.strictEqual(config.ai.provider, 'openai');
         });
     });
 
@@ -274,22 +584,6 @@ describe('Types Module - 类型定义模块测试', () => {
             
             assert.strictEqual(response.content, '');
             assert.strictEqual(response.error, 'API request failed');
-        });
-    });
-
-    describe('LogFile - 日志文件接口', () => {
-        it('验证日志文件对象 - 包含名称、路径、大小、修改时间', () => {
-            const logFile: LogFile = {
-                name: 'app.log',
-                path: '/var/logs/app.log',
-                size: 1024,
-                modifiedTime: new Date('2024-01-15T10:30:00Z')
-            };
-            
-            assert.strictEqual(logFile.name, 'app.log');
-            assert.strictEqual(logFile.path, '/var/logs/app.log');
-            assert.strictEqual(logFile.size, 1024);
-            assert.ok(logFile.modifiedTime instanceof Date);
         });
     });
 });

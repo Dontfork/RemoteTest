@@ -33,7 +33,7 @@
       ],
       "explorer": [
         {
-          "id": "autotest-logs-view",
+          "id": "autotestLogs",
           "name": "日志监控"
         }
       ]
@@ -44,10 +44,6 @@
         "title": "AutoTest: 上传文件并执行命令"
       },
       {
-        "command": "autotest.monitorLogs",
-        "title": "AutoTest: 监控日志"
-      },
-      {
         "command": "autotest.refreshLogs",
         "title": "AutoTest: 刷新日志列表",
         "icon": "$(refresh)"
@@ -55,21 +51,50 @@
       {
         "command": "autotest.downloadLog",
         "title": "AutoTest: 下载日志文件"
+      },
+      {
+        "command": "autotest.openLog",
+        "title": "AutoTest: 打开日志文件"
+      },
+      {
+        "command": "autotest.reloadConfig",
+        "title": "AutoTest: 刷新配置",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "autotest.openConfig",
+        "title": "AutoTest: 打开配置文件",
+        "icon": "$(gear)"
       }
     ],
     "menus": {
       "view/title": [
         {
           "command": "autotest.refreshLogs",
-          "when": "view == autotest-logs-view",
-          "group": "navigation"
+          "when": "view == autotestLogs",
+          "group": "navigation@1"
+        },
+        {
+          "command": "autotest.reloadConfig",
+          "when": "view == autotestLogs",
+          "group": "navigation@2"
+        },
+        {
+          "command": "autotest.openConfig",
+          "when": "view == autotestLogs",
+          "group": "navigation@3"
         }
       ],
       "view/item/context": [
         {
           "command": "autotest.downloadLog",
-          "when": "view == autotest-logs-view && viewItem == logFile",
-          "group": "inline"
+          "when": "view == autotestLogs && viewItem == logFile",
+          "group": "inline@1"
+        },
+        {
+          "command": "autotest.openLog",
+          "when": "view == autotestLogs && viewItem == logFile",
+          "group": "inline@2"
         }
       ]
     },
@@ -87,13 +112,16 @@
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
+    "compile:test": "tsc -p ./test",
     "watch": "tsc -watch -p ./",
-    "test": "npm run compile && node ./out/test/runTest.js",
+    "test": "npm run compile && npm run compile:test && node ./out/test/runTest.js",
     "test:unit": "mocha --require ts-node/register 'test/suite/*.test.ts'"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.6",
     "@types/node": "^18.19.0",
+    "@types/ssh2": "^1.15.5",
+    "@types/ssh2-sftp-client": "^9.0.6",
     "@types/vscode": "^1.85.0",
     "@vscode/test-electron": "^2.3.8",
     "mocha": "^10.2.0",
@@ -101,6 +129,8 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
-    "axios": "^1.6.5"
+    "axios": "^1.6.5",
+    "ssh2": "^1.17.0",
+    "ssh2-sftp-client": "^12.0.1"
   }
 }

@@ -2,7 +2,7 @@
 
 ## 1. 模块概述
 
-日志监控模块负责监控服务器或本地的日志文件，提供日志文件列表获取、定时刷新、下载等功能。模块支持从远程服务器 API 获取日志列表，也支持直接读取本地日志目录。
+日志监控模块负责监控远程服务器上的日志文件，提供多目录监控、日志文件列表获取、目录浏览、日志下载等功能。模块通过 SSH/SCP 协议与远程服务器交互，支持树形视图展示目录结构和文件信息。
 
 ## 2. 设计方案
 
@@ -14,24 +14,28 @@
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
 │  ┌─────────────────────────────────────────────────────┐    │
-│  │              fetchLogFiles()                         │    │
-│  │  ┌──────────────┐        ┌──────────────┐           │    │
-│  │  │ 远程 API 请求 │  或 →  │ 本地目录读取  │           │    │
-│  │  └──────────────┘        └──────────────┘           │    │
+│  │         getDirectories()                             │    │
+│  │  从配置获取监控目录列表                               │    │
 │  └─────────────────────────────────────────────────────┘    │
 │                          ↓                                   │
 │  ┌─────────────────────────────────────────────────────┐    │
-│  │              startMonitoring()                       │    │
-│  │  ┌──────────┐  ┌──────────┐  ┌──────────────────┐   │    │
-│  │  │ 首次获取  │→│ 定时刷新  │→│ 回调通知更新      │   │    │
-│  │  └──────────┘  └──────────┘  └──────────────────┘   │    │
+│  │         fetchDirectoryContents(path)                 │    │
+│  │  通过 SCP 获取远程目录内容                            │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                          ↓                                   │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │         fetchAllDirectories()                        │    │
+│  │  获取所有配置目录的内容                               │    │
 │  └─────────────────────────────────────────────────────┘    │
 │                                                              │
 │  ┌─────────────────────────────────────────────────────┐    │
-│  │              downloadLog()                           │    │
-│  │  ┌──────────────┐        ┌──────────────┐           │    │
-│  │  │ 远程 API 下载 │  或 →  │ 本地文件复制  │           │    │
-│  │  └──────────────┘        └──────────────┘           │    │
+│  │         downloadLog(logFile)                         │    │
+│  │  通过 SCP 下载远程日志文件                            │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                                                              │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │         downloadLogWithProgress(logFile)             │    │
+│  │  带进度提示的下载功能                                 │    │
 │  └─────────────────────────────────────────────────────┘    │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
@@ -43,72 +47,96 @@
 插件激活
     │
     ▼
-startMonitoring()
-    │
-    ├── 首次获取日志列表
-    │
-    ├── 启动定时器
+读取配置中的日志目录列表
     │
     ▼
-定时刷新 (默认 5 秒)
+TreeView 显示目录列表
     │
-    ├── fetchLogFiles()
-    │   │
-    │   ├── 尝试远程 API
-    │   │   │
-    │   │   └── 成功 → 返回列表
-    │   │
-    │   └── 失败 → 读取本地目录
+    ├── 用户点击目录
+    │       │
+    │       ▼
+    │   fetchDirectoryContents()
+    │       │
+    │       ▼
+    │   SCP 连接远程服务器
+    │       │
+    │       ▼
+    │   获取目录内容（文件和子目录）
+    │       │
+    │       ▼
+    │   显示文件列表（含大小、修改时间）
     │
-    ├── 回调通知 UI 更新
+    ├── 用户点击子目录
+    │       │
+    │       ▼
+    │   递归获取子目录内容
     │
-    ▼
-用户点击下载
-    │
-    ▼
-downloadLog()
-    │
-    ├── 创建下载目录
-    │
-    ├── 尝试远程下载
-    │   │
-    │   └── 失败 → 本地复制
-    │
-    ▼
-返回本地文件路径
+    └── 用户点击文件
+            │
+            ▼
+        downloadLogWithProgress()
+            │
+            ▼
+        SCP 下载文件到本地
+            │
+            ▼
+        显示下载完成提示
 ```
 
-### 2.3 双模式设计
+### 2.3 多目录监控设计
 
-模块支持两种工作模式：
+模块支持配置多个日志监控目录，每个目录包含：
 
-| 模式 | 数据来源 | 适用场景 |
-|------|----------|----------|
-| 远程模式 | 服务器 API | 生产环境、远程服务器 |
-| 本地模式 | 本地文件系统 | 开发环境、本地测试 |
+| 属性 | 类型 | 说明 |
+|------|------|------|
+| name | string | 目录在界面显示的名称 |
+| path | string | 远程服务器上的目录路径 |
 
-当远程 API 不可用时，自动降级到本地模式。
-
-## 3. 类型定义
-
-### 3.1 日志文件接口
-
-```typescript
-interface LogFile {
-    name: string;           // 文件名，如 "app.log"
-    path: string;           // 文件路径，如 "/var/logs/app.log"
-    size: number;           // 文件大小（字节）
-    modifiedTime: Date;     // 最后修改时间
+配置示例：
+```json
+{
+    "logs": {
+        "directories": [
+            { "name": "应用日志", "path": "/var/log/myapp" },
+            { "name": "测试日志", "path": "/var/log/autotest" },
+            { "name": "系统日志", "path": "/var/log/system" }
+        ],
+        "downloadPath": "./downloads",
+        "refreshInterval": 5000
+    }
 }
 ```
 
-### 3.2 日志配置接口
+## 3. 类型定义
+
+### 3.1 日志目录配置
+
+```typescript
+interface LogDirectoryConfig {
+    name: string;           // 目录显示名称，如 "应用日志"
+    path: string;           // 远程目录路径，如 "/var/log/myapp"
+}
+```
+
+### 3.2 日志文件/目录接口
+
+```typescript
+interface LogFile {
+    name: string;           // 文件/目录名，如 "app.log" 或 "subdir"
+    path: string;           // 完整路径，如 "/var/logs/app.log"
+    size: number;           // 大小（字节）
+    modifiedTime: Date;     // 最后修改时间
+    isDirectory: boolean;   // 是否为目录
+}
+```
+
+### 3.3 日志配置接口
 
 ```typescript
 interface LogsConfig {
-    monitorDirectory: string;     // 监控目录
-    downloadPath: string;         // 下载路径
-    refreshInterval: number;      // 刷新间隔(毫秒)
+    directories: LogDirectoryConfig[];  // 监控目录列表
+    downloadPath: string;               // 下载路径
+    refreshInterval: number;            // 刷新间隔(毫秒)
 }
 ```
 
@@ -118,116 +146,93 @@ interface LogsConfig {
 
 ```typescript
 export class LogMonitor {
-    private logFiles: LogFile[] = [];
-    private refreshInterval: number = 5000;
-    private monitorTimer: ReturnType<typeof setInterval> | null = null;
-    private onLogFilesChange: ((files: LogFile[]) => void) | null = null;
+    private logFilesCache: Map<string, LogFile[]> = new Map();
 
     constructor();
     
-    // 核心方法
-    async fetchLogFiles(): Promise<LogFile[]>;
-    startMonitoring(onChange: (files: LogFile[]) => void): void;
-    stopMonitoring(): void;
+    // 目录管理
+    getDirectories(): LogDirectoryConfig[];
     
-    // 下载方法
+    // 内容获取
+    async fetchDirectoryContents(dirPath: string): Promise<LogFile[]>;
+    async fetchAllDirectories(): Promise<Map<string, LogFile[]>>;
+    
+    // 下载功能
     async downloadLog(logFile: LogFile): Promise<string>;
-    async downloadSelectedLog(): Promise<string | null>;
+    async downloadLogWithProgress(logFile: LogFile): Promise<string>;
     
-    // 工具方法
-    getLogFiles(): LogFile[];
+    // 缓存管理
+    getCachedFiles(dirPath: string): LogFile[] | undefined;
 }
 ```
 
 ### 4.2 核心方法
 
-#### fetchLogFiles(): Promise<LogFile[]>
+#### getDirectories(): LogDirectoryConfig[]
 
-获取日志文件列表。
+获取配置的监控目录列表。
 
 **返回值**：
-- `Promise<LogFile[]>`: 日志文件数组
+- `LogDirectoryConfig[]`: 目录配置数组
 
 **实现逻辑**：
 ```typescript
-async fetchLogFiles(): Promise<LogFile[]> {
+getDirectories(): LogDirectoryConfig[] {
     const config = getConfig();
-
-    try {
-        // 1. 尝试从远程 API 获取
-        const response = await axios.get(`${config.server.executeCommand}/logs`, {
-            timeout: 10000
-        });
-        
-        if (response.data && Array.isArray(response.data)) {
-            this.logFiles = response.data.map((item: any) => ({
-                name: item.name,
-                path: item.path,
-                size: item.size || 0,
-                modifiedTime: new Date(item.modifiedTime || Date.now())
-            }));
-        }
-    } catch {
-        // 2. 远程失败，读取本地目录
-        const logDir = config.logs.monitorDirectory;
-        if (fs.existsSync(logDir)) {
-            const files = fs.readdirSync(logDir);
-            this.logFiles = files
-                .filter(file => file.endsWith('.log'))  // 只处理 .log 文件
-                .map(file => {
-                    const filePath = path.join(logDir, file);
-                    const stats = fs.statSync(filePath);
-                    return {
-                        name: file,
-                        path: filePath,
-                        size: stats.size,
-                        modifiedTime: stats.mtime
-                    };
-                });
-        }
-    }
-
-    return this.logFiles;
+    return config.logs.directories || [];
 }
 ```
 
-#### startMonitoring(onChange: (files: LogFile[]) => void): void
+#### fetchDirectoryContents(dirPath: string): Promise<LogFile[]>
 
-启动定时监控。
+获取指定目录的内容列表。
 
 **参数**：
-- `onChange`: 日志列表变化时的回调函数
+- `dirPath`: 远程目录路径
+
+**返回值**：
+- `Promise<LogFile[]>`: 文件和子目录数组
 
 **实现逻辑**：
 ```typescript
-startMonitoring(onChange: (files: LogFile[]) => void): void {
-    this.onLogFilesChange = onChange;
-    
-    // 1. 立即获取一次
-    this.fetchLogFiles().then(files => {
-        onChange(files);
-    });
-
-    // 2. 启动定时器
-    this.monitorTimer = setInterval(async () => {
-        const files = await this.fetchLogFiles();
-        if (this.onLogFilesChange) {
-            this.onLogFilesChange(files);
-        }
-    }, this.refreshInterval);
+async fetchDirectoryContents(dirPath: string): Promise<LogFile[]> {
+    try {
+        const items = await listDirectory(dirPath);
+        
+        // 排序：目录优先，然后按名称排序
+        return items.sort((a, b) => {
+            if (a.isDirectory !== b.isDirectory) {
+                return a.isDirectory ? -1 : 1;
+            }
+            return a.name.localeCompare(b.name);
+        });
+    } catch (error: any) {
+        console.error(`[LogMonitor] 获取目录 ${dirPath} 内容失败:`, error.message);
+        return [];
+    }
 }
 ```
 
-#### stopMonitoring(): void
+#### fetchAllDirectories(): Promise<Map<string, LogFile[]>>
 
-停止监控。
+获取所有配置目录的内容。
 
+**返回值**：
+- `Promise<Map<string, LogFile[]>>`: 目录路径到文件列表的映射
+
+**实现逻辑**：
 ```typescript
-stopMonitoring(): void {
-    if (this.monitorTimer) {
-        clearInterval(this.monitorTimer);
-        this.monitorTimer = null;
+async fetchAllDirectories(): Promise<Map<string, LogFile[]>> {
+    const directories = this.getDirectories();
+    const results = new Map<string, LogFile[]>();
+
+    for (const dir of directories) {
+        const files = await this.fetchDirectoryContents(dir.path);
+        results.set(dir.path, files);
+        this.logFilesCache.set(dir.path, files);
     }
+
+    return results;
 }
 ```
 
@@ -235,7 +240,7 @@ stopMonitoring(): void {
 
 #### downloadLog(logFile: LogFile): Promise<string>
 
-下载指定日志文件。
+下载指定日志文件到本地。
 
 **参数**：
 - `logFile`: 要下载的日志文件对象
@@ -246,78 +251,47 @@ stopMonitoring(): void {
 **实现逻辑**：
 ```typescript
 async downloadLog(logFile: LogFile): Promise<string> {
+    if (logFile.isDirectory) {
+        throw new Error('不能下载目录');
+    }
+
     const config = getConfig();
     const downloadPath = config.logs.downloadPath;
     
-    // 1. 确保下载目录存在
+    // 确保下载目录存在
     if (!fs.existsSync(downloadPath)) {
         fs.mkdirSync(downloadPath, { recursive: true });
     }
 
-    const localPath = path.join(downloadPath, logFile.name);
-
-    try {
-        // 2. 尝试从远程下载
-        const response = await axios.get(`${config.server.executeCommand}/logs/download`, {
-            params: { path: logFile.path },
-            responseType: 'arraybuffer',
-            timeout: 30000
-        });
-
-        fs.writeFileSync(localPath, response.data);
-        return localPath;
-    } catch {
-        // 3. 远程失败，尝试本地复制
-        if (fs.existsSync(logFile.path)) {
-            fs.copyFileSync(logFile.path, localPath);
-            return localPath;
-        }
-        throw new Error('无法下载日志文件');
-    }
+    // 通过 SCP 下载文件
+    const localPath = await downloadFile(logFile.path, path.join(downloadPath, logFile.name));
+    return localPath;
 }
 ```
 
-#### downloadSelectedLog(): Promise<string | null>
+#### downloadLogWithProgress(logFile: LogFile): Promise<string>
 
-显示选择器让用户选择要下载的日志。
+带进度提示的下载功能。
+
+**参数**：
+- `logFile`: 要下载的日志文件对象
 
 **返回值**：
-- `Promise<string | null>`: 下载成功返回路径，取消返回 null
+- `Promise<string>`: 本地文件路径
 
 **实现逻辑**：
 ```typescript
-async downloadSelectedLog(): Promise<string | null> {
-    const files = await this.fetchLogFiles();
-    
-    if (files.length === 0) {
-        vscode.window.showInformationMessage('没有可下载的日志文件');
-        return null;
-    }
-
-    // 1. 显示快速选择器
-    const selected = await vscode.window.showQuickPick(
-        files.map(f => ({
-            label: f.name,
-            description: `${formatSize(f.size)} | ${formatDate(f.modifiedTime)}`
-        })),
-        { placeHolder: '选择要下载的日志文件' }
-    );
-
-    if (!selected) {
-        return null;
-    }
-
-    // 2. 查找选中的文件
-    const logFile = files.find(f => f.name === selected.label);
-    if (!logFile) {
-        return null;
-    }
-
-    // 3. 下载文件
-    const localPath = await this.downloadLog(logFile);
-    vscode.window.showInformationMessage(`日志已下载到: ${localPath}`);
-    
-    return localPath;
+async downloadLogWithProgress(logFile: LogFile): Promise<string> {
+    return vscode.window.withProgress({
+        location: vscode.ProgressLocation.Notification,
+        title: '下载日志',
+        cancellable: false
+    }, async (progress) => {
+        progress.report({ message: `正在下载 ${logFile.name}...` });
+        const localPath = await this.downloadLog(logFile);
+        vscode.window.showInformationMessage(`日志已下载到: ${localPath}`);
+        return localPath;
+    });
 }
 ```
 
@@ -331,7 +305,8 @@ async downloadSelectedLog(): Promise<string | null> {
 function formatSize(bytes: number): string {
     if (!bytes || bytes < 1024) return (bytes || 0) + ' B';
     if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / 1048576).toFixed(1) + ' MB';
+    if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
+    return (bytes / 1073741824).toFixed(1) + ' GB';
 }
 ```
 
@@ -339,6 +314,7 @@ function formatSize(bytes: number): string {
 - `512` → `"512 B"`
 - `2048` → `"2.0 KB"`
 - `5242880` → `"5.0 MB"`
+- `1073741824` → `"1.0 GB"`
 
 #### formatDate(date: Date): string
 
@@ -357,152 +333,212 @@ function formatDate(date: Date): string {
 **示例输出**：
 - `new Date()` → `"2024/1/15 10:30:00"`
 
-## 5. 使用示例
-
-### 5.1 基本使用
-
-```typescript
-import { LogMonitor } from './core/logMonitor';
-
-const monitor = new LogMonitor();
-
-// 获取日志列表
-const files = await monitor.fetchLogFiles();
-console.log('Log files:', files);
-
-// 下载日志
-if (files.length > 0) {
-    const localPath = await monitor.downloadLog(files[0]);
-    console.log('Downloaded to:', localPath);
-}
-```
-
-### 5.2 启动监控
-
-```typescript
-const monitor = new LogMonitor();
-
-// 启动定时监控
-monitor.startMonitoring((files) => {
-    console.log('Log files updated:', files.length);
-    // 更新 UI 显示
-    updateTreeView(files);
-});
-
-// 停止监控
-monitor.stopMonitoring();
-```
-
-### 5.3 用户选择下载
-
-```typescript
-const monitor = new LogMonitor();
-
-// 显示选择器让用户选择
-const localPath = await monitor.downloadSelectedLog();
-if (localPath) {
-    console.log('Downloaded to:', localPath);
-}
-```
-
-## 6. TreeView 集成
+## 5. TreeView 集成
 
 日志监控模块与 VSCode TreeView 集成，显示在资源管理器面板中。
 
-### 6.1 TreeView 数据提供者
+### 5.1 TreeView 数据提供者
 
 ```typescript
-class LogTreeDataProvider implements vscode.TreeDataProvider<LogFileItem> {
-    private _onDidChangeTreeData = new vscode.EventEmitter<LogFileItem | undefined>();
+class LogTreeDataProvider implements vscode.TreeDataProvider<LogTreeItem> {
+    private _onDidChangeTreeData = new vscode.EventEmitter<LogTreeItem | undefined>();
     readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
-    refresh(files: LogFile[]): void {
-        this.files = files;
+    refresh(): void {
         this._onDidChangeTreeData.fire(undefined);
     }
 
-    getTreeItem(element: LogFileItem): vscode.TreeItem {
+    getTreeItem(element: LogTreeItem): vscode.TreeItem {
         return element;
     }
 
-    getChildren(): LogFileItem[] {
-        return this.files.map(file => new LogFileItem(file));
+    async getChildren(element?: LogTreeItem): Promise<LogTreeItem[]> {
+        if (!element) {
+            // 根级别：显示配置的目录列表
+            const directories = this.logMonitor.getDirectories();
+            return directories.map(dir => new LogTreeItem(dir, true, true));
+        }
+
+        if (element.contextValue === 'logDirectory' && element.directoryConfig) {
+            // 配置目录：获取其内容
+            const contents = await this.logMonitor.fetchDirectoryContents(element.directoryConfig.path);
+            return this.createLogItems(contents);
+        }
+
+        if (element.contextValue === 'logSubDirectory' && element.logFile) {
+            // 子目录：获取其内容
+            const contents = await this.logMonitor.fetchDirectoryContents(element.logFile.path);
+            return this.createLogItems(contents);
+        }
+
+        return [];
+    }
+
+    private createLogItems(files: LogFile[]): LogTreeItem[] {
+        return files.map(file => new LogTreeItem(file, file.isDirectory, false));
     }
 }
 ```
 
-### 6.2 TreeItem 实现
+### 5.2 TreeItem 实现
 
 ```typescript
-class LogFileItem extends vscode.TreeItem {
-    constructor(file: LogFile) {
-        super(file.name, vscode.TreeItemCollapsibleState.None);
-        
-        this.description = `${formatSize(file.size)} | ${formatDate(file.modifiedTime)}`;
-        this.tooltip = file.path;
-        this.command = {
-            command: 'autotest.downloadLog',
-            title: 'Download Log',
-            arguments: [file]
-        };
+class LogTreeItem extends vscode.TreeItem {
+    public logFile: LogFile | null;
+    public directoryConfig: LogDirectoryConfig | null;
+
+    constructor(
+        item: LogFile | LogDirectoryConfig,
+        isDirectory: boolean,
+        isConfigDir: boolean = false
+    ) {
+        if (isConfigDir) {
+            // 配置的顶级目录
+            const dir = item as LogDirectoryConfig;
+            super(dir.name, vscode.TreeItemCollapsibleState.Collapsed);
+            this.directoryConfig = dir;
+            this.logFile = null;
+            this.contextValue = 'logDirectory';
+            this.iconPath = new vscode.ThemeIcon('folder');
+            this.tooltip = `路径: ${dir.path}`;
+        } else if (isDirectory) {
+            // 子目录
+            const file = item as LogFile;
+            super(file.name, vscode.TreeItemCollapsibleState.Collapsed);
+            this.logFile = file;
+            this.directoryConfig = null;
+            this.contextValue = 'logSubDirectory';
+            this.iconPath = new vscode.ThemeIcon('folder');
+            this.tooltip = `路径: ${file.path}`;
+        } else {
+            // 文件
+            const file = item as LogFile;
+            super(file.name, vscode.TreeItemCollapsibleState.None);
+            this.logFile = file;
+            this.directoryConfig = null;
+            this.description = `${formatSize(file.size)} | ${formatDate(file.modifiedTime)}`;
+            this.tooltip = `路径: ${file.path}\n大小: ${formatSize(file.size)}\n修改时间: ${formatDate(file.modifiedTime)}`;
+            this.contextValue = 'logFile';
+            this.iconPath = new vscode.ThemeIcon('file-text');
+            this.command = {
+                command: 'autotest.downloadLog',
+                title: '下载日志',
+                arguments: [this]
+            };
+        }
     }
 }
 ```
 
-## 7. API 接口规范
+### 5.3 TreeView 层级结构
 
-### 7.1 获取日志列表
-
-**请求**：
 ```
-GET {executeCommand}/logs
+日志监控 (TreeView)
+├── 应用日志 (配置目录)
+│   ├── subdir1 (子目录)
+│   │   ├── log1.log (文件)
+│   │   └── log2.log (文件)
+│   ├── app.log (文件) - 显示: "2.0 KB | 2024/1/15 10:30:00"
+│   └── error.log (文件) - 显示: "512 B | 2024/1/15 09:00:00"
+├── 测试日志 (配置目录)
+│   └── test.log (文件)
+└── 系统日志 (配置目录)
+    └── system.log (文件)
 ```
 
-**响应**：
-```json
-[
-    {
-        "name": "app.log",
-        "path": "/var/logs/app.log",
-        "size": 1024,
-        "modifiedTime": "2024-01-15T10:30:00Z"
-    },
-    {
-        "name": "error.log",
-        "path": "/var/logs/error.log",
-        "size": 512,
-        "modifiedTime": "2024-01-15T09:00:00Z"
+## 6. 命令注册
+
+### 6.1 刷新日志列表
+
+```typescript
+vscode.commands.registerCommand('autotest.refreshLogs', () => {
+    logTreeDataProvider.refresh();
+});
+```
+
+### 6.2 下载日志
+
+```typescript
+vscode.commands.registerCommand('autotest.downloadLog', async (item: LogTreeItem) => {
+    if (item && item.logFile && !item.logFile.isDirectory) {
+        await logMonitor.downloadLogWithProgress(item.logFile);
     }
-]
+});
 ```
 
-### 7.2 下载日志文件
+### 6.3 打开日志
 
-**请求**：
-```
-GET {executeCommand}/logs/download?path=/var/logs/app.log
+```typescript
+vscode.commands.registerCommand('autotest.openLog', async (item: LogTreeItem) => {
+    if (item && item.logFile && !item.logFile.isDirectory) {
+        const localPath = await logMonitor.downloadLog(item.logFile);
+        const document = await vscode.workspace.openTextDocument(localPath);
+        await vscode.window.showTextDocument(document);
+    }
+});
 ```
 
-**响应**：
-- Content-Type: `application/octet-stream`
-- Body: 文件二进制内容
+## 7. SCP 客户端集成
+
+日志监控模块依赖 SCP 客户端进行远程文件操作。
+
+### 7.1 listDirectory 函数
+
+获取远程目录内容。
+
+```typescript
+async function listDirectory(remotePath: string): Promise<LogFile[]> {
+    const sftp = await connect();
+    const items = await sftp.list(remotePath);
+    
+    return items.map(item => ({
+        name: item.name,
+        path: path.posix.join(remotePath, item.name),
+        size: item.size,
+        modifiedTime: new Date(item.modifyTime),
+        isDirectory: item.type === 'd'
+    }));
+}
+```
+
+### 7.2 downloadFile 函数
+
+下载远程文件。
+
+```typescript
+async function downloadFile(remotePath: string, localPath?: string): Promise<string> {
+    const config = getConfig();
+    const sftp = await connect();
+
+    const fileName = path.basename(remotePath);
+    const local = localPath || path.join(config.logs.downloadPath, fileName);
+
+    const localDir = path.dirname(local);
+    if (!fs.existsSync(localDir)) {
+        fs.mkdirSync(localDir, { recursive: true });
+    }
+
+    await sftp.fastGet(remotePath, local);
+    return local;
+}
+```
 
 ## 8. 错误处理
 
 | 错误场景 | 处理方式 |
 |----------|----------|
-| 远程 API 不可用 | 降级到本地目录读取 |
-| 本地目录不存在 | 返回空数组 |
+| SCP 连接失败 | 返回空数组，记录错误日志 |
+| 目录不存在 | 返回空数组 |
 | 下载目录创建失败 | 抛出异常 |
-| 文件复制失败 | 抛出异常并提示用户 |
-| 网络超时 | 10 秒超时后降级 |
+| 文件下载失败 | 显示错误提示 |
+| 尝试下载目录 | 抛出异常，显示提示 |
 
 ## 9. 性能考虑
 
-- 定时刷新默认 5 秒间隔，可配置
-- API 请求设置 10 秒超时
-- 文件下载设置 30 秒超时
-- 只读取 `.log` 扩展名的文件
+- 使用缓存减少重复请求
+- 按需加载目录内容（懒加载）
+- 文件列表排序在客户端完成
+- 支持手动刷新，避免自动轮询开销
 
 ## 10. 测试覆盖
 
@@ -511,9 +547,10 @@ GET {executeCommand}/logs/download?path=/var/logs/app.log
 - 文件大小格式化测试
 - 日期格式化测试
 - 日志文件对象创建测试
-- 文件排序测试
-- 文件过滤测试
-- 错误处理测试
-- 刷新机制测试
+- 日志目录对象测试
+- 文件排序测试（目录优先）
+- 路径处理测试
+- SCP 客户端集成测试
+- 下载功能测试
 
 详见测试文件：`test/suite/logMonitor.test.ts`

@@ -2,7 +2,7 @@
 
 ## 1. 概述
 
-AutoTest 是一款 VSCode 插件，旨在简化测试工作流程，提供文件上传、命令执行、日志监控和 AI 对话功能。插件采用模块化设计，支持灵活配置和扩展。
+AutoTest 是一款 VSCode 插件，旨在简化测试工作流程，提供文件上传、命令执行、日志监控和 AI 对话功能。插件采用模块化设计，支持灵活配置和扩展。通过 SSH/SCP 协议与远程服务器交互，实现安全的文件传输和命令执行。
 
 ## 2. 系统架构
 
@@ -23,11 +23,12 @@ AutoTest 是一款 VSCode 插件，旨在简化测试工作流程，提供文件
 ├─────────┴────────────────┴─────────────────────┴─────────────┤
 │                      Core Modules                             │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
-│  │   AIChat    │  │ LogMonitor  │  │FileUploader │          │
+│  │   AIChat    │  │ LogMonitor  │  │  Uploader   │          │
 │  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘          │
 │         │                │                │                  │
 │  ┌──────▼──────┐  ┌──────▼──────┐  ┌──────▼──────┐          │
-│  │CommandExec  │  │   Config    │  │   axios     │          │
+│  │CommandExec  │  │   Config    │  │ SSH/SCP     │          │
+│  │  (SSH)      │  │             │  │  Client     │          │
 │  └─────────────┘  └─────────────┘  └─────────────┘          │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -37,8 +38,8 @@ AutoTest 是一款 VSCode 插件，旨在简化测试工作流程，提供文件
 | 模块 | 文档 | 职责 |
 |------|------|------|
 | 配置模块 | [config.md](./config.md) | 管理插件配置，支持自动创建默认配置文件 |
-| 命令执行模块 | [commandExecutor.md](./commandExecutor.md) | 执行终端命令并过滤输出 |
-| 日志监控模块 | [logMonitor.md](./logMonitor.md) | 监控和下载服务器日志文件 |
+| 命令执行模块 | [commandExecutor.md](./commandExecutor.md) | 通过 SSH 执行远程命令并过滤输出 |
+| 日志监控模块 | [logMonitor.md](./logMonitor.md) | 通过 SCP 监控和下载远程日志文件 |
 | AI 对话模块 | [ai.md](./ai.md) | 提供与 AI 模型的对话能力 |
 
 ## 4. 配置结构
@@ -47,7 +48,7 @@ AutoTest 是一款 VSCode 插件，旨在简化测试工作流程，提供文件
 
 ```typescript
 interface AutoTestConfig {
-    server: ServerConfig;      // 服务器连接配置
+    server: ServerConfig;      // 服务器连接配置 (SSH/SCP)
     command: CommandConfig;    // 命令执行配置
     ai: AIConfig;              // AI 服务配置
     logs: LogsConfig;          // 日志监控配置
@@ -67,10 +68,9 @@ interface AutoTestConfig {
         "port": 22,
         "username": "root",
         "password": "",
-        "uploadUrl": "http://192.168.1.100:8080/upload",
-        "executeCommand": "http://192.168.1.100:8080/execute",
-        "logDirectory": "/var/logs",
-        "downloadPath": "./downloads"
+        "privateKeyPath": "",
+        "localProjectPath": "",
+        "remoteDirectory": "/tmp/autotest"
     },
     "command": {
         "executeCommand": "npm test",
@@ -91,9 +91,67 @@ interface AutoTestConfig {
         }
     },
     "logs": {
-        "monitorDirectory": "/var/logs",
+        "directories": [
+            { "name": "应用日志", "path": "/var/log/myapp" },
+            { "name": "测试日志", "path": "/var/log/autotest" }
+        ],
         "downloadPath": "./downloads",
         "refreshInterval": 5000
+    }
+}
+```
+
+### 4.4 关键配置说明
+
+#### 服务器配置 (SSH/SCP)
+
+| 字段 | 说明 |
+|------|------|
+| host | 服务器 IP 地址 |
+| port | SSH 端口，默认 22 |
+| username | SSH 用户名 |
+| password | SSH 密码（密码认证） |
+| privateKeyPath | SSH 私钥路径（密钥认证，优先于密码） |
+| localProjectPath | 本地工程路径，**无需配置，默认自动使用 VSCode 打开的工作区路径** |
+| remoteDirectory | 远程工作目录，上传文件的目标目录 |
+
+#### 日志配置
+
+| 字段 | 说明 |
+|------|------|
+| directories | 监控目录列表，支持多个目录 |
+| directories[].name | 目录在界面显示的名称 |
+| directories[].path | 远程服务器上的目录路径 |
+| downloadPath | 日志下载保存路径 |
+| refreshInterval | 自动刷新间隔（毫秒） |
+
+#### 命令配置
+
+| 字段 | 说明 |
+|------|------|
+| executeCommand | 要执行的命令，支持变量替换 |
+| filterPatterns | 过滤正则表达式数组 |
+| filterMode | 过滤模式：include（保留匹配行）/ exclude（排除匹配行） |
+
+**支持的命令变量**:
+
+| 变量 | 说明 | 示例值 |
+|------|------|--------|
+| `{filePath}` | 远程文件完整路径 | `/tmp/autotest/tests/test_example.py` |
+| `{fileName}` | 远程文件名 | `test_example.py` |
+| `{fileDir}` | 远程文件所在目录 | `/tmp/autotest/tests` |
+| `{localPath}` | 本地文件完整路径 | `D:\project\tests\test_example.py` |
+| `{localDir}` | 本地文件所在目录 | `D:\project\tests` |
+| `{localFileName}` | 本地文件名 | `test_example.py` |
+| `{remoteDir}` | 远程工程目录 | `/tmp/autotest` |
+
+**命令配置示例**:
+```json
+{
+    "command": {
+        "executeCommand": "pytest {filePath} -v",
+        "filterPatterns": ["PASSED", "FAILED", "ERROR"],
+        "filterMode": "include"
     }
 }
 ```
@@ -119,18 +177,31 @@ interface AutoTestConfig {
 **位置**: 资源管理器面板下方
 
 **组件**:
-- 日志文件树形列表
+- 配置目录列表（可折叠）
+- 子目录树形结构
+- 文件列表（显示大小和修改时间）
 - 刷新按钮
-- 文件大小和修改时间显示
+
+**功能**:
+- 支持多目录监控
+- 目录可展开浏览
+- 点击文件下载日志
 
 ## 6. 命令列表
 
 | 命令 ID | 描述 | 触发方式 |
 |---------|------|----------|
 | `autotest.uploadAndExecute` | 上传文件并执行命令 | 命令面板 |
-| `autotest.monitorLogs` | 监控日志 | 命令面板 |
 | `autotest.refreshLogs` | 刷新日志列表 | 工具栏按钮 |
 | `autotest.downloadLog` | 下载日志文件 | 点击日志项 |
+| `autotest.openLog` | 打开日志文件 | 右键菜单 |
+| `autotest.reloadConfig` | 手动刷新配置 | 工具栏按钮 / 命令面板 |
+| `autotest.openConfig` | 打开配置文件 | 工具栏按钮 / 命令面板 |
+
+**配置动态刷新**：
+- 插件会自动监听配置文件变化，修改配置文件后会自动刷新
+- 也可以通过 `autotest.reloadConfig` 命令手动刷新配置
+- 日志监控视图工具栏提供刷新配置和打开配置文件的快捷按钮
 
 ## 7. 数据流
 
@@ -140,15 +211,17 @@ interface AutoTestConfig {
 用户选择文件
     │
     ▼
-FileUploader.uploadAndExecute()
+Uploader.uploadAndExecute()
     │
-    ├── 读取文件内容
+    ├── 计算本地文件的相对路径
+    │
+    ├── 映射到远程目录对应位置
     │
     ▼
-POST → server.uploadUrl
+SCP 上传文件到远程服务器
     │
     ▼
-CommandExecutor.executeWithConfig()
+SSHClient.executeRemoteCommand()
     │
     ├── 执行配置命令
     │
@@ -158,7 +231,32 @@ CommandExecutor.executeWithConfig()
 显示到 OutputChannel
 ```
 
-### 7.2 AI 对话流程
+### 7.2 日志监控流程
+
+```
+读取配置中的日志目录列表
+    │
+    ▼
+TreeView 显示目录列表
+    │
+    ├── 用户点击目录
+    │       │
+    │       ▼
+    │   SCP 获取远程目录内容
+    │       │
+    │       ▼
+    │   显示文件列表（含大小、修改时间）
+    │
+    └── 用户点击文件
+            │
+            ▼
+        SCP 下载文件到本地
+            │
+            ▼
+        显示下载完成提示
+```
+
+### 7.3 AI 对话流程
 
 ```
 用户输入消息
@@ -206,15 +304,17 @@ AI 模块设计支持未来扩展为 Agent 模式:
 | 错误场景 | 处理方式 |
 |----------|----------|
 | 配置加载失败 | 使用默认配置 |
-| API 请求失败 | 显示错误消息 |
+| SSH 连接失败 | 显示错误消息 |
+| SCP 传输失败 | 显示错误消息并记录日志 |
 | 文件操作失败 | 抛出异常并提示用户 |
 | 模型名称为空 | 使用默认模型 |
 
 ## 10. 性能考虑
 
-- 日志监控使用定时器，默认 5 秒刷新
+- 日志监控按需加载，避免自动轮询
+- SSH 连接复用，减少连接开销
 - API 请求设置 60 秒超时
-- 文件上传设置 30 秒超时
+- SCP 传输支持大文件
 
 ## 11. 目录结构
 
@@ -226,8 +326,10 @@ d:\AutoTest
 │   │   └── index.ts
 │   ├── core/                 # 核心功能模块
 │   │   ├── commandExecutor.ts
-│   │   ├── fileUploader.ts
-│   │   └── logMonitor.ts
+│   │   ├── uploader.ts
+│   │   ├── logMonitor.ts
+│   │   ├── sshClient.ts      # SSH 客户端
+│   │   └── scpClient.ts      # SCP 客户端
 │   ├── ai/                   # AI 模块
 │   │   ├── chat.ts
 │   │   └── providers.ts
@@ -242,6 +344,8 @@ d:\AutoTest
 │       ├── config.test.ts
 │       ├── commandExecutor.test.ts
 │       ├── logMonitor.test.ts
+│       ├── sshClient.test.ts
+│       ├── scpClient.test.ts
 │       └── ai.test.ts
 ├── doc/                      # 文档
 │   ├── Design.md             # 本文档（总览）
@@ -272,7 +376,7 @@ npm run compile
 ### 12.3 运行测试
 
 ```bash
-npm run test:unit
+npm test
 ```
 
 ### 12.4 调试

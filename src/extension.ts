@@ -1,31 +1,34 @@
 import * as vscode from 'vscode';
-import { loadConfig, getConfig } from './config';
-import { CommandExecutor, FileUploader, LogMonitor } from './core';
+import { loadConfig, reloadConfig, setupConfigWatcher, onConfigChanged, dispose as disposeConfig } from './config';
+import { CommandExecutor, FileUploader } from './core';
 import { AIChat } from './ai';
-import { LogsTreeProvider, LogTreeItem, AIChatViewProvider } from './views';
+import { LogTreeView, LogTreeItem, AIChatViewProvider } from './views';
 
 let commandExecutor: CommandExecutor;
 let fileUploader: FileUploader;
-let logMonitor: LogMonitor;
 let aiChat: AIChat;
-let logsTreeProvider: LogsTreeProvider;
+let logTreeView: LogTreeView;
 
 export function activate(context: vscode.ExtensionContext) {
     const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     
     if (workspacePath) {
         loadConfig(workspacePath);
-        const config = getConfig();
-        if (!config.logs.monitorDirectory) {
-            config.logs.monitorDirectory = config.server.logDirectory || '/var/logs';
-        }
     }
 
     commandExecutor = new CommandExecutor();
     fileUploader = new FileUploader(commandExecutor);
-    logMonitor = new LogMonitor();
     aiChat = new AIChat();
-    logsTreeProvider = new LogsTreeProvider(logMonitor);
+    logTreeView = new LogTreeView();
+
+    setupConfigWatcher(context);
+
+    onConfigChanged((newConfig) => {
+        console.log('[AutoTest] Config updated, components notified');
+        if (logTreeView) {
+            logTreeView.refresh();
+        }
+    });
 
     const commands = [
         vscode.commands.registerCommand('autotest.uploadAndExecute', async () => {
@@ -36,50 +39,73 @@ export function activate(context: vscode.ExtensionContext) {
             }
         }),
 
-        vscode.commands.registerCommand('autotest.monitorLogs', async () => {
-            try {
-                await logMonitor.downloadSelectedLog();
-            } catch (error: any) {
-                vscode.window.showErrorMessage(`下载失败: ${error.message}`);
-            }
-        }),
-
         vscode.commands.registerCommand('autotest.refreshLogs', async () => {
-            await logsTreeProvider.refresh();
+            logTreeView.refresh();
         }),
 
         vscode.commands.registerCommand('autotest.downloadLog', async (item: LogTreeItem) => {
-            if (item && item.logFile) {
-                try {
-                    const localPath = await logMonitor.downloadLog(item.logFile);
-                    vscode.window.showInformationMessage(`已下载到: ${localPath}`);
-                } catch (error: any) {
-                    vscode.window.showErrorMessage(`下载失败: ${error.message}`);
+            await logTreeView.downloadLog(item);
+        }),
+
+        vscode.commands.registerCommand('autotest.openLog', async (item: LogTreeItem) => {
+            await logTreeView.openLogInEditor(item);
+        }),
+
+        vscode.commands.registerCommand('autotest.reloadConfig', () => {
+            const wsPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+            if (wsPath) {
+                reloadConfig(wsPath);
+                vscode.window.showInformationMessage('AutoTest 配置已刷新');
+            } else {
+                vscode.window.showWarningMessage('无法刷新配置：未找到工作区');
+            }
+        }),
+
+        vscode.commands.registerCommand('autotest.openConfig', async () => {
+            const wsPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+            if (wsPath) {
+                const configPath = vscode.workspace.getConfiguration('autotest').get<string>('configPath') || 'autotest-config.json';
+                const pathsToTry = [
+                    vscode.Uri.file(`${wsPath}/.vscode/${configPath}`),
+                    vscode.Uri.file(`${wsPath}/${configPath}`)
+                ];
+                
+                for (const uri of pathsToTry) {
+                    try {
+                        await vscode.workspace.fs.stat(uri);
+                        const doc = await vscode.workspace.openTextDocument(uri);
+                        await vscode.window.showTextDocument(doc);
+                        return;
+                    } catch {
+                        continue;
+                    }
                 }
+                
+                vscode.window.showWarningMessage('未找到配置文件，将在首次使用时自动创建');
+            } else {
+                vscode.window.showWarningMessage('无法打开配置文件：未找到工作区');
             }
         })
     ];
-
-    const treeView = vscode.window.createTreeView('autotest-logs-view', {
-        treeDataProvider: logsTreeProvider,
-        showCollapseAll: false
-    });
 
     const aiChatView = vscode.window.registerWebviewViewProvider(
         AIChatViewProvider.viewType, 
         new AIChatViewProvider(context.extensionUri, aiChat)
     );
 
-    context.subscriptions.push(...commands, treeView, aiChatView);
+    context.subscriptions.push(...commands, aiChatView);
+
+    logTreeView.start();
 
     vscode.window.showInformationMessage('AutoTest 插件已启动');
 }
 
 export function deactivate() {
-    if (logMonitor) {
-        logMonitor.stopMonitoring();
+    if (logTreeView) {
+        logTreeView.stop();
     }
     if (commandExecutor) {
         commandExecutor.dispose();
     }
+    disposeConfig();
 }

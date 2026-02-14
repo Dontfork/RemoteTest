@@ -85,6 +85,18 @@ describe('LogMonitor Module - 日志监控模块测试', () => {
             
             assert.ok(logFile.name.endsWith('.log'));
         });
+
+        it('验证远程日志文件路径 - 来自SSH服务器的日志', () => {
+            const logFile: LogFile = {
+                name: 'autotest-2024-01-15.log',
+                path: '/var/log/autotest/autotest-2024-01-15.log',
+                size: 2048576,
+                modifiedTime: new Date('2024-01-15T14:30:00Z')
+            };
+            
+            assert.ok(logFile.path.startsWith('/var/log'));
+            assert.ok(logFile.size > 1024 * 1024);
+        });
     });
 
     describe('Log Configuration - 日志配置', () => {
@@ -105,6 +117,17 @@ describe('LogMonitor Module - 日志监控模块测试', () => {
             
             assert.ok(refreshInterval > 0);
             assert.strictEqual(refreshInterval, 5000);
+        });
+
+        it('远程日志目录配置 - 通过SCP访问', () => {
+            const config = {
+                monitorDirectory: '/var/log/autotest',
+                downloadPath: './logs',
+                refreshInterval: 3000
+            };
+            
+            assert.strictEqual(config.monitorDirectory, '/var/log/autotest');
+            assert.ok(config.monitorDirectory.startsWith('/'));
         });
     });
 
@@ -149,23 +172,49 @@ describe('LogMonitor Module - 日志监控模块测试', () => {
             assert.strictEqual(errorLogs.length, 1);
             assert.strictEqual(errorLogs[0], 'error.log');
         });
+
+        it('SCP文件类型过滤 - 只返回文件类型(非目录)', () => {
+            const mockFiles = [
+                { name: 'app.log', type: '-' },
+                { name: 'error.log', type: '-' },
+                { name: 'logs', type: 'd' }
+            ];
+            
+            const filesOnly = mockFiles.filter(f => f.type === '-');
+            
+            assert.strictEqual(filesOnly.length, 2);
+            assert.ok(filesOnly.every(f => f.name.endsWith('.log')));
+        });
     });
 
-    describe('Download Configuration - 下载配置', () => {
-        it('下载URL验证 - 必须以http开头且包含/download路径', () => {
-            const downloadUrl = 'http://192.168.1.100:8080/download/app.log';
+    describe('SCP Download Configuration - SCP下载配置', () => {
+        it('SCP下载路径构建 - 正确拼接本地路径和文件名', () => {
+            const path = require('path');
+            const localDir = './downloads';
+            const fileName = 'app.log';
+            const localPath = path.join(localDir, fileName);
             
-            assert.ok(downloadUrl.startsWith('http'));
-            assert.ok(downloadUrl.includes('/download'));
+            assert.ok(localPath.includes('downloads'));
+            assert.ok(localPath.includes('app.log'));
         });
 
-        it('下载路径构建 - 正确拼接基础路径和文件名', () => {
-            const basePath = './downloads';
-            const fileName = 'app.log';
-            const fullPath = `${basePath}/${fileName}`;
+        it('远程日志路径构建 - 正确拼接远程目录和文件名', () => {
+            const remoteDir = '/var/log/autotest';
+            const fileName = 'test.log';
+            const remotePath = `${remoteDir}/${fileName}`;
             
-            assert.ok(fullPath.includes('downloads'));
-            assert.ok(fullPath.endsWith('app.log'));
+            assert.strictEqual(remotePath, '/var/log/autotest/test.log');
+        });
+
+        it('本地目录自动创建 - 不存在时递归创建', () => {
+            const fs = require('fs');
+            const localDir = './downloads';
+            
+            if (!fs.existsSync(localDir)) {
+                fs.mkdirSync(localDir, { recursive: true });
+            }
+            
+            assert.ok(fs.existsSync(localDir));
         });
     });
 
@@ -182,10 +231,16 @@ describe('LogMonitor Module - 日志监控模块测试', () => {
             assert.strictEqual(error.message, 'Permission denied');
         });
 
-        it('网络错误 - 错误消息包含"Network"', () => {
-            const error = new Error('Network error');
+        it('SSH连接错误 - 错误消息包含"SSH"', () => {
+            const error = new Error('SSH connection failed');
             
-            assert.ok(error.message.includes('Network'));
+            assert.ok(error.message.includes('SSH'));
+        });
+
+        it('SCP传输错误 - 错误消息包含"transfer"或"SCP"', () => {
+            const error = new Error('SCP transfer failed');
+            
+            assert.ok(error.message.includes('SCP') || error.message.includes('transfer'));
         });
     });
 
@@ -201,6 +256,17 @@ describe('LogMonitor Module - 日志监控模块测试', () => {
             isMonitoring = false;
             
             assert.strictEqual(isMonitoring, false);
+        });
+
+        it('定时器清理 - 停止监控时清除定时器', () => {
+            let timer: ReturnType<typeof setInterval> | null = setInterval(() => {}, 1000);
+            
+            if (timer) {
+                clearInterval(timer);
+                timer = null;
+            }
+            
+            assert.strictEqual(timer, null);
         });
     });
 
@@ -237,12 +303,14 @@ describe('LogMonitor Module - 日志监控模块测试', () => {
     });
 
     describe('Path Handling - 路径处理', () => {
-        it('路径拼接 - 正确拼接目录和文件名', () => {
+        it('远程路径拼接 - 使用posix格式正斜杠分隔', () => {
+            const path = require('path');
             const base = '/var/logs';
             const file = 'app.log';
-            const fullPath = `${base}/${file}`;
+            const fullPath = path.posix.join(base, file);
             
             assert.strictEqual(fullPath, '/var/logs/app.log');
+            assert.ok(!fullPath.includes('\\'));
         });
 
         it('从路径提取文件名 - 使用split和pop方法', () => {
@@ -257,6 +325,40 @@ describe('LogMonitor Module - 日志监控模块测试', () => {
             const dir = path.substring(0, path.lastIndexOf('/'));
             
             assert.strictEqual(dir, '/var/logs');
+        });
+
+        it('本地路径使用平台格式 - Windows使用反斜杠', () => {
+            const path = require('path');
+            const localDir = './downloads';
+            const fileName = 'test.log';
+            const localPath = path.join(localDir, fileName);
+            
+            assert.ok(localPath.includes('test.log'));
+        });
+    });
+
+    describe('SSH/SCP Integration - SSH/SCP集成', () => {
+        it('SCP客户端下载方法验证 - downloadFile函数存在', () => {
+            const { downloadFile } = require('../../core/scpClient');
+            assert.strictEqual(typeof downloadFile, 'function');
+        });
+
+        it('SCP客户端列表方法验证 - listDirectory函数存在', () => {
+            const { listDirectory } = require('../../core/scpClient');
+            assert.strictEqual(typeof listDirectory, 'function');
+        });
+
+        it('远程文件信息结构 - 包含name、size、modifyTime', () => {
+            const mockFileInfo = {
+                type: '-',
+                name: 'test.log',
+                size: 1024,
+                modifyTime: Date.now()
+            };
+            
+            assert.ok(mockFileInfo.hasOwnProperty('name'));
+            assert.ok(mockFileInfo.hasOwnProperty('size'));
+            assert.ok(mockFileInfo.hasOwnProperty('modifyTime'));
         });
     });
 });

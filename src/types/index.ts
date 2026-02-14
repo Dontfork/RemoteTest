@@ -3,16 +3,25 @@ export interface ServerConfig {
     port: number;
     username: string;
     password: string;
-    uploadUrl: string;
-    executeCommand: string;
-    logDirectory: string;
-    downloadPath: string;
+    privateKeyPath: string;
+    localProjectPath: string;
+    remoteDirectory: string;
 }
 
 export interface CommandConfig {
     executeCommand: string;
     filterPatterns: string[];
     filterMode: 'include' | 'exclude';
+}
+
+export interface CommandVariables {
+    filePath: string;
+    fileName: string;
+    fileDir: string;
+    localPath: string;
+    localDir: string;
+    localFileName: string;
+    remoteDir: string;
 }
 
 export interface QWenConfig {
@@ -33,8 +42,13 @@ export interface AIConfig {
     openai: OpenAIConfig;
 }
 
+export interface LogDirectoryConfig {
+    name: string;
+    path: string;
+}
+
 export interface LogsConfig {
-    monitorDirectory: string;
+    directories: LogDirectoryConfig[];
     downloadPath: string;
     refreshInterval: number;
 }
@@ -61,4 +75,5 @@ export interface LogFile {
     path: string;
     size: number;
     modifiedTime: Date;
+    isDirectory: boolean;
 }

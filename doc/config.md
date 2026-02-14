@@ -61,11 +61,10 @@ interface ServerConfig {
     host: string;              // 服务器主机地址，如 "192.168.1.100"
     port: number;              // SSH 端口，默认 22
     username: string;          // 登录用户名
-    password: string;          // 登录密码
-    uploadUrl: string;         // 文件上传接口 URL
-    executeCommand: string;    // 命令执行接口 URL
-    logDirectory: string;      // 服务器日志目录
-    downloadPath: string;      // 本地下载路径
+    password: string;          // 登录密码（密码认证）
+    privateKeyPath: string;    // 私钥路径（密钥认证，优先于密码）
+    localProjectPath: string;  // 本地工程路径（用于计算相对路径）
+    remoteDirectory: string;   // 远程工作目录（上传文件的目标目录）
 }
 ```
 
@@ -76,17 +75,42 @@ interface ServerConfig {
 | host | string | 是 | "192.168.1.100" | 目标服务器 IP 地址 |
 | port | number | 是 | 22 | SSH 连接端口 |
 | username | string | 是 | "root" | SSH 登录用户名 |
-| password | string | 否 | "" | SSH 登录密码 |
-| uploadUrl | string | 是 | - | 文件上传 API 地址 |
-| executeCommand | string | 是 | - | 命令执行 API 地址 |
-| logDirectory | string | 是 | "/var/logs" | 日志文件存储目录 |
-| downloadPath | string | 是 | "./downloads" | 日志下载本地路径 |
+| password | string | 否 | "" | SSH 登录密码（密码认证） |
+| privateKeyPath | string | 否 | "" | SSH 私钥路径（密钥认证，优先于密码） |
+| localProjectPath | string | 否 | "" | 本地工程根路径，**留空则自动使用 VSCode 打开的工作区路径** |
+| remoteDirectory | string | 是 | "/tmp/autotest" | 远程工作目录，上传文件的目标目录 |
+
+**认证方式**：
+
+| 认证方式 | 配置 | 优先级 |
+|----------|------|--------|
+| 密钥认证 | privateKeyPath | 高（优先使用） |
+| 密码认证 | password | 低（密钥不存在时使用） |
+
+**路径映射说明**：
+
+上传文件时，插件会自动计算本地文件的相对路径，并映射到远程目录的对应位置：
+
+```
+本地文件: {localProjectPath}/xx/a/test.js
+远程路径: {remoteDirectory}/xx/a/test.js
+```
+
+**重要说明**：
+- `localProjectPath` **无需配置**，默认自动使用 VSCode 打开的工作区路径
+- 只有在需要指定不同的工程根目录时才需要手动配置此项
+
+例如：
+- VSCode 打开的工作区: `D:\Projects\Test`（自动使用）
+- 远程工程路径: `/home/user/test`
+- 本地文件: `D:\Projects\Test\src\utils\helper.js`
+- 上传后远程路径: `/home/user/test/src/utils/helper.js`
 
 ### 3.3 命令配置
 
 ```typescript
 interface CommandConfig {
-    executeCommand: string;              // 要执行的命令
+    executeCommand: string;              // 要执行的命令（支持变量）
     filterPatterns: string[];            // 过滤正则表达式数组
     filterMode: 'include' | 'exclude';   // 过滤模式
 }
@@ -96,9 +120,63 @@ interface CommandConfig {
 
 | 字段 | 类型 | 必填 | 默认值 | 说明 |
 |------|------|------|--------|------|
-| executeCommand | string | 是 | "echo 'No command configured'" | 默认执行的命令 |
+| executeCommand | string | 是 | "echo 'No command configured'" | 默认执行的命令，支持变量替换 |
 | filterPatterns | string[] | 否 | [] | 正则表达式数组，用于过滤输出 |
 | filterMode | enum | 是 | "include" | include: 只保留匹配行；exclude: 排除匹配行 |
+
+**命令变量**：
+
+executeCommand 支持以下变量，在执行时自动替换为对应的值：
+
+| 变量 | 说明 | 示例值 |
+|------|------|--------|
+| `{filePath}` | 远程文件完整路径 | `/tmp/autotest/tests/test_example.py` |
+| `{fileName}` | 远程文件名 | `test_example.py` |
+| `{fileDir}` | 远程文件所在目录 | `/tmp/autotest/tests` |
+| `{localPath}` | 本地文件完整路径 | `D:\project\tests\test_example.py` |
+| `{localDir}` | 本地文件所在目录 | `D:\project\tests` |
+| `{localFileName}` | 本地文件名 | `test_example.py` |
+| `{remoteDir}` | 远程工程目录 | `/tmp/autotest` |
+
+**命令配置示例（带变量）**：
+```json
+{
+    "command": {
+        "executeCommand": "pytest {filePath} -v",
+        "filterPatterns": ["PASSED", "FAILED", "ERROR"],
+        "filterMode": "include"
+    }
+}
+```
+
+**常用测试框架配置示例**：
+
+Python pytest:
+```json
+{
+    "executeCommand": "cd {remoteDir} && pytest {filePath} -v",
+    "filterPatterns": ["PASSED", "FAILED", "ERROR"],
+    "filterMode": "include"
+}
+```
+
+JavaScript Jest:
+```json
+{
+    "executeCommand": "cd {remoteDir} && npx jest {filePath} --coverage=false",
+    "filterPatterns": ["PASS", "FAIL", "✓", "✕"],
+    "filterMode": "include"
+}
+```
+
+Java Maven:
+```json
+{
+    "executeCommand": "cd {remoteDir} && mvn test -Dtest={fileName}",
+    "filterPatterns": ["Tests run:", "FAILURE", "ERROR"],
+    "filterMode": "include"
+}
+```
 
 **过滤模式示例**：
 
@@ -157,10 +235,15 @@ interface OpenAIConfig {
 ### 3.5 日志配置
 
 ```typescript
+interface LogDirectoryConfig {
+    name: string;                 // 目录显示名称
+    path: string;                 // 远程目录路径
+}
+
 interface LogsConfig {
-    monitorDirectory: string;     // 监控目录
-    downloadPath: string;         // 下载路径
-    refreshInterval: number;      // 刷新间隔(毫秒)
+    directories: LogDirectoryConfig[];  // 监控目录列表
+    downloadPath: string;               // 下载路径
+    refreshInterval: number;            // 刷新间隔(毫秒)
 }
 ```
 
@@ -168,9 +251,19 @@ interface LogsConfig {
 
 | 字段 | 类型 | 必填 | 默认值 | 说明 |
 |------|------|------|--------|------|
-| monitorDirectory | string | 是 | "/var/logs" | 要监控的日志目录 |
+| directories | LogDirectoryConfig[] | 是 | [] | 要监控的日志目录列表 |
+| directories[].name | string | 是 | - | 目录在界面显示的名称 |
+| directories[].path | string | 是 | - | 远程服务器上的目录路径 |
 | downloadPath | string | 是 | "./downloads" | 日志下载保存路径 |
 | refreshInterval | number | 是 | 5000 | 自动刷新间隔，单位毫秒 |
+
+**日志监控功能**：
+
+- 支持配置多个日志目录
+- 树形视图展示目录和文件
+- 显示文件大小和修改时间
+- 支持展开子目录
+- 点击文件可下载到本地
 
 ## 4. 功能实现
 
@@ -210,15 +303,51 @@ interface LogsConfig {
 
 **注意**：如未调用 loadConfig，返回默认配置。
 
-#### reloadConfig(workspacePath: string): AutoTestConfig
+#### reloadConfig(workspacePath?: string): AutoTestConfig
 
 重新加载配置文件。
 
 **参数**：
-- `workspacePath`: 工作区路径
+- `workspacePath`: 工作区路径（可选，默认使用当前工作区）
 
 **返回值**：
 - `AutoTestConfig`: 重新加载后的配置对象
+
+**特性**：
+- 如果配置发生变化，会触发 `onConfigChanged` 事件通知所有监听者
+
+#### setupConfigWatcher(context: vscode.ExtensionContext): void
+
+设置配置文件监听器，自动监听配置文件变化。
+
+**参数**：
+- `context`: VSCode 扩展上下文
+
+**监听事件**：
+- `onDidChange`: 配置文件被修改时自动刷新
+- `onDidCreate`: 配置文件被创建时自动加载
+- `onDidDelete`: 配置文件被删除时使用默认配置
+
+#### onConfigChanged 事件
+
+配置变化事件，用于监听配置更新。
+
+```typescript
+import { onConfigChanged } from './config';
+
+// 监听配置变化
+onConfigChanged((newConfig) => {
+    console.log('配置已更新:', newConfig);
+    // 执行配置更新后的操作
+});
+```
+
+#### getConfigFilePath(): string
+
+获取当前配置文件的完整路径。
+
+**返回值**：
+- `string`: 配置文件路径
 
 ### 4.2 默认配置
 
@@ -229,14 +358,13 @@ const defaultConfig: AutoTestConfig = {
         port: 22,
         username: "root",
         password: "",
-        uploadUrl: "http://192.168.1.100:8080/upload",
-        executeCommand: "http://192.168.1.100:8080/execute",
-        logDirectory: "/var/logs",
-        downloadPath: "./downloads"
+        privateKeyPath: "",
+        localProjectPath: "",
+        remoteDirectory: "/tmp/autotest"
     },
     command: {
-        executeCommand: "echo 'No command configured'",
-        filterPatterns: [],
+        executeCommand: "pytest {filePath} -v",
+        filterPatterns: ["PASSED", "FAILED", "ERROR"],
         filterMode: "include"
     },
     ai: {
@@ -253,7 +381,10 @@ const defaultConfig: AutoTestConfig = {
         }
     },
     logs: {
-        monitorDirectory: "/var/logs",
+        directories: [
+            { name: "应用日志", path: "/var/logs" },
+            { name: "测试日志", path: "/var/log/autotest" }
+        ],
         downloadPath: "./downloads",
         refreshInterval: 5000
     }
@@ -304,10 +435,9 @@ function onConfigChanged() {
         "port": 22,
         "username": "admin",
         "password": "your-password",
-        "uploadUrl": "http://10.0.0.1:8080/api/upload",
-        "executeCommand": "http://10.0.0.1:8080/api/execute",
-        "logDirectory": "/var/log/myapp",
-        "downloadPath": "./logs"
+        "privateKeyPath": "",
+        "localProjectPath": "",
+        "remoteDirectory": "/home/admin/autotest"
     },
     "command": {
         "executeCommand": "pytest tests/",
@@ -328,7 +458,11 @@ function onConfigChanged() {
         }
     },
     "logs": {
-        "monitorDirectory": "/var/log/myapp",
+        "directories": [
+            { "name": "应用日志", "path": "/var/log/myapp" },
+            { "name": "测试日志", "path": "/var/log/autotest" },
+            { "name": "系统日志", "path": "/var/log/system" }
+        ],
         "downloadPath": "./logs",
         "refreshInterval": 3000
     }
@@ -353,5 +487,7 @@ function onConfigChanged() {
 - 配置结构验证
 - 配置值修改测试
 - AI 模型配置测试
+- 日志目录列表配置测试
+- ServerConfig 不包含 logDirectory/downloadPath 测试
 
-详见测试文件：`test/suite/config.test.ts`
+详见测试文件：`test/suite/types.test.ts`

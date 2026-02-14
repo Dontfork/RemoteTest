@@ -9,14 +9,13 @@ const defaultConfig: AutoTestConfig = {
         port: 22,
         username: "root",
         password: "",
-        uploadUrl: "http://192.168.1.100:8080/upload",
-        executeCommand: "http://192.168.1.100:8080/execute",
-        logDirectory: "/var/logs",
-        downloadPath: "./downloads"
+        privateKeyPath: "",
+        localProjectPath: "",
+        remoteDirectory: "/tmp/autotest"
     },
     command: {
-        executeCommand: "echo 'No command configured'",
-        filterPatterns: [],
+        executeCommand: "pytest {filePath} -v",
+        filterPatterns: ["PASSED", "FAILED", "ERROR"],
         filterMode: "include"
     },
     ai: {
@@ -33,13 +32,21 @@ const defaultConfig: AutoTestConfig = {
         }
     },
     logs: {
-        monitorDirectory: "/var/logs",
+        directories: [
+            { name: "应用日志", path: "/var/logs" },
+            { name: "测试日志", path: "/var/log/autotest" }
+        ],
         downloadPath: "./downloads",
         refreshInterval: 5000
     }
 };
 
 let config: AutoTestConfig | null = null;
+let configFilePath: string = '';
+let fileWatcher: vscode.FileSystemWatcher | null = null;
+let configChangeEmitter = new vscode.EventEmitter<AutoTestConfig>();
+
+export const onConfigChanged = configChangeEmitter.event;
 
 export function loadConfig(workspacePath: string): AutoTestConfig {
     const configPath = vscode.workspace.getConfiguration('autotest').get<string>('configPath') || 'autotest-config.json';
@@ -61,6 +68,7 @@ export function loadConfig(workspacePath: string): AutoTestConfig {
         fullPath = pathsToTry[0];
     }
 
+    configFilePath = fullPath;
     console.log('[AutoTest] Loading config from:', fullPath);
 
     try {
@@ -92,8 +100,82 @@ export function getConfig(): AutoTestConfig {
     return config || defaultConfig;
 }
 
-export function reloadConfig(workspacePath: string): AutoTestConfig {
-    return loadConfig(workspacePath);
+export function reloadConfig(workspacePath?: string): AutoTestConfig {
+    const wsPath = workspacePath || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!wsPath) {
+        console.warn('[AutoTest] No workspace path available for config reload');
+        return getConfig();
+    }
+    
+    const oldConfig = config;
+    const newConfig = loadConfig(wsPath);
+    
+    if (JSON.stringify(oldConfig) !== JSON.stringify(newConfig)) {
+        configChangeEmitter.fire(newConfig);
+        console.log('[AutoTest] Config changed, notifying listeners');
+    }
+    
+    return newConfig;
+}
+
+export function setupConfigWatcher(context: vscode.ExtensionContext): void {
+    if (fileWatcher) {
+        fileWatcher.dispose();
+    }
+
+    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!workspacePath) {
+        console.warn('[AutoTest] No workspace available for config watcher');
+        return;
+    }
+
+    const configPath = vscode.workspace.getConfiguration('autotest').get<string>('configPath') || 'autotest-config.json';
+    
+    const watchPatterns = [
+        new vscode.RelativePattern(workspacePath, `.vscode/${configPath}`),
+        new vscode.RelativePattern(workspacePath, configPath)
+    ];
+
+    fileWatcher = vscode.workspace.createFileSystemWatcher(
+        new vscode.RelativePattern(workspacePath, `**/${configPath}`),
+        false,
+        false,
+        false
+    );
+
+    fileWatcher.onDidChange((uri) => {
+        console.log('[AutoTest] Config file changed:', uri.fsPath);
+        reloadConfig(workspacePath);
+        vscode.window.showInformationMessage('AutoTest 配置已自动刷新');
+    });
+
+    fileWatcher.onDidCreate((uri) => {
+        console.log('[AutoTest] Config file created:', uri.fsPath);
+        reloadConfig(workspacePath);
+        vscode.window.showInformationMessage('AutoTest 配置文件已创建并加载');
+    });
+
+    fileWatcher.onDidDelete((uri) => {
+        console.log('[AutoTest] Config file deleted:', uri.fsPath);
+        config = defaultConfig;
+        configChangeEmitter.fire(defaultConfig);
+        vscode.window.showWarningMessage('AutoTest 配置文件已删除，使用默认配置');
+    });
+
+    context.subscriptions.push(fileWatcher);
+    console.log('[AutoTest] Config watcher setup complete');
+}
+
+export function getConfigFilePath(): string {
+    return configFilePath;
+}
+
+export function dispose(): void {
+    if (fileWatcher) {
+        fileWatcher.dispose();
+        fileWatcher = null;
+    }
+    configChangeEmitter.dispose();
 }
 
 export { defaultConfig };

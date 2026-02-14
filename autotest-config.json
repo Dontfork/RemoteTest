@@ -4,15 +4,16 @@
     "port": 22,
     "username": "root",
     "password": "",
-    "uploadUrl": "http://192.168.1.100:8080/upload",
-    "executeCommand": "http://192.168.1.100:8080/execute",
-    "logDirectory": "/var/logs",
-    "downloadPath": "./downloads"
+    "privateKeyPath": "",
+    "localProjectPath": "",
+    "remoteDirectory": "/tmp/autotest"
   },
   "command": {
-    "executeCommand": "npm test",
+    "executeCommand": "pytest {filePath} -v",
     "filterPatterns": [
-      "\\[error\\]"
+      "PASSED",
+      "FAILED",
+      "ERROR"
     ],
     "filterMode": "include"
   },
@@ -30,7 +31,10 @@
     }
   },
   "logs": {
-    "monitorDirectory": "/var/logs",
+    "directories": [
+      { "name": "应用日志", "path": "/var/logs" },
+      { "name": "测试日志", "path": "/var/log/autotest" }
+    ],
     "downloadPath": "./downloads",
     "refreshInterval": 5000
   }

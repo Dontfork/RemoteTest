@@ -4,6 +4,9 @@ out/
 # 依赖
 node_modules/
 
+# VSCode 测试临时目录
+.vscode-test/
+
 # 日志
 *.log
 npm-debug.log*
