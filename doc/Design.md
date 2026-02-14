@@ -41,6 +41,7 @@ AutoTest 是一款 VSCode 插件，旨在简化测试工作流程，提供文件
 | 命令执行模块 | [commandExecutor.md](./commandExecutor.md) | 通过 SSH 执行远程命令并过滤输出 |
 | 日志监控模块 | [logMonitor.md](./logMonitor.md) | 通过 SCP 监控和下载远程日志文件 |
 | AI 对话模块 | [ai.md](./ai.md) | 提供与 AI 模型的对话能力 |
+| AI 多模式架构 | [ai-mode-design.md](./ai-mode-design.md) | AI 模块多模式架构设计（Chat/Agent/Plan） |
 
 ## 4. 配置结构
 
@@ -292,12 +293,14 @@ AIChat.sendMessage()
 
 详见 [AI 对话模块文档](./ai.md#10-扩展性设计)
 
-### 8.2 Agent 模式预留
+### 8.2 AI 多模式架构
 
-AI 模块设计支持未来扩展为 Agent 模式:
-- 消息历史管理
-- 工具调用接口预留
-- 多轮对话支持
+AI 模块支持多种交互模式，采用可扩展的架构设计：
+- **Chat 模式**：基础对话模式，提供问答能力
+- **Agent 模式**：自主执行模式，可调用工具完成任务
+- **Plan 模式**：规划模式，分解复杂任务并逐步执行
+
+详见 [AI 多模式架构设计](./ai-mode-design.md)
 
 ## 9. 错误处理
 
@@ -332,7 +335,12 @@ d:\AutoTest
 │   │   └── scpClient.ts      # SCP 客户端
 │   ├── ai/                   # AI 模块
 │   │   ├── chat.ts
-│   │   └── providers.ts
+│   │   ├── providers.ts
+│   │   ├── modes/            # 多模式实现（规划中）
+│   │   │   ├── chatMode.ts
+│   │   │   ├── agentMode.ts
+│   │   │   └── planMode.ts
+│   │   └── tools/            # Agent 工具（规划中）
 │   ├── types/                # 类型定义
 │   │   └── index.ts
 │   └── views/                # UI 视图
@@ -353,6 +361,7 @@ d:\AutoTest
 │   ├── commandExecutor.md    # 命令执行模块详细文档
 │   ├── logMonitor.md         # 日志监控模块详细文档
 │   ├── ai.md                 # AI对话模块详细文档
+│   ├── ai-mode-design.md     # AI多模式架构设计
 │   └── FUNCTIONS.md          # 功能使用文档
 ├── package.json              # 扩展配置
 ├── tsconfig.json             # TypeScript 配置
@@ -391,4 +400,5 @@ npm test
 - [命令执行模块详细文档](./commandExecutor.md)
 - [日志监控模块详细文档](./logMonitor.md)
 - [AI 对话模块详细文档](./ai.md)
+- [AI 多模式架构设计](./ai-mode-design.md)
 - [功能使用文档](./FUNCTIONS.md)
