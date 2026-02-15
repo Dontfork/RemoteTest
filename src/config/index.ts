@@ -41,6 +41,26 @@ const defaultConfig: AutoTestConfig = {
     }
 };
 
+function deepMerge<T>(target: T, source: Partial<T>): T {
+    const result = { ...target };
+    for (const key in source) {
+        if (source[key] !== undefined) {
+            if (
+                typeof source[key] === 'object' &&
+                source[key] !== null &&
+                !Array.isArray(source[key]) &&
+                typeof target[key] === 'object' &&
+                target[key] !== null
+            ) {
+                result[key] = deepMerge(target[key], source[key] as any);
+            } else {
+                result[key] = source[key] as any;
+            }
+        }
+    }
+    return result;
+}
+
 let config: AutoTestConfig | null = null;
 let configFilePath: string = '';
 let fileWatcher: vscode.FileSystemWatcher | null = null;
@@ -85,8 +105,10 @@ export function loadConfig(workspacePath: string): AutoTestConfig {
         }
         const content = fs.readFileSync(fullPath, 'utf-8');
         const loadedConfig = JSON.parse(content);
-        config = { ...defaultConfig, ...loadedConfig };
+        config = deepMerge(defaultConfig, loadedConfig);
         console.log('[AutoTest] Config loaded successfully');
+        console.log('[AutoTest] AI Provider:', config?.ai?.provider);
+        console.log('[AutoTest] QWen API Key:', config?.ai?.qwen?.apiKey ? '已配置' : '未配置');
         return config as AutoTestConfig;
     } catch (error: any) {
         console.error('[AutoTest] Config load error:', error.message);
