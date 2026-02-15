@@ -228,117 +228,75 @@ npm run test:unit
 5. **禁止随意修改接口定义**
    - 接口修改需评估影响范围，更新所有相关代码
 
-## 示例：新增 AI 模型配置
+## 打包发布
 
-以下是一个完整的开发流程示例：
-
-### 1. 需求分析
-
-**需求**: AI 模块需要支持配置模型名称，除了厂商可配置，模型名字也需要可配置
-
-**影响范围**:
-- 类型定义: `QWenConfig`, `OpenAIConfig`
-- AI 模块: `providers.ts`
-- 配置模块: `config/index.ts`
-- 文档: `ai.md`, `config.md`, `Design.md`, `FUNCTIONS.md`
-- 测试: `types.test.ts`, `config.test.ts`, `ai.test.ts`
-
-### 2. 更新设计文档
-
-**更新 `doc/ai.md`**:
-- 添加模型配置说明
-- 更新支持的模型列表
-- 添加模型选择逻辑
-
-**更新 `doc/config.md`**:
-- 更新 `QWenConfig` 和 `OpenAIConfig` 接口
-- 添加 `model` 字段说明
-
-**更新 `doc/Design.md`**:
-- 更新配置结构
-- 更新配置示例
-
-**更新 `doc/FUNCTIONS.md`**:
-- 添加模型选择说明
-- 更新配置示例
-
-### 3. 代码实现
-
-**更新 `src/types/index.ts`**:
-```typescript
-interface QWenConfig {
-    apiKey: string;
-    apiUrl: string;
-    model: string;  // 新增
-}
-
-interface OpenAIConfig {
-    apiKey: string;
-    apiUrl: string;
-    model: string;  // 新增
-}
-```
-
-**更新 `src/ai/providers.ts`**:
-```typescript
-async send(messages: AIMessage[]): Promise<AIResponse> {
-    const model = this.config.model || 'qwen-turbo';  // 使用配置的模型
-    // ...
-}
-```
-
-**更新 `src/config/index.ts`**:
-```typescript
-qwen: {
-    apiKey: "",
-    apiUrl: "...",
-    model: "qwen-turbo"  // 新增默认值
-}
-```
-
-### 4. 更新测试用例
-
-**更新 `test/suite/types.test.ts`**:
-- 添加模型字段验证测试
-
-**更新 `test/suite/config.test.ts`**:
-- 添加默认模型验证测试
-- 添加模型修改测试
-
-**更新 `test/suite/ai.test.ts`**:
-- 添加模型配置测试
-- 添加模型默认值测试
-
-### 5. 执行测试验证
+### 编译与打包
 
 ```bash
-npm run test:unit
+# 编译 TypeScript
+npm run compile
+
+# webpack 打包（生产模式）
+npm run package
+
+# 生成 VSIX 安装包
+vsce package
 ```
 
-确保所有测试通过。
+### 打包配置
+
+| 文件 | 说明 |
+|------|------|
+| `webpack.config.js` | webpack 配置，打包输出到 `dist/` |
+| `.vscodeignore` | 打包排除规则，排除源码和测试文件 |
+
+### 打包输出
+
+- 输出目录: `dist/extension.js`
+- 安装包: `autotest-{version}.vsix`
+
+### 安装测试
+
+1. 在 VSCode 中按 `Ctrl+Shift+P`
+2. 输入 `Extensions: Install from VSIX...`
+3. 选择生成的 `.vsix` 文件
 
 ## 附录：文档结构
 
 ```
-d:\AutoTest
-├── README.md               # 项目说明（根目录）
-├── DEVELOPMENT.md          # 开发流程文档（本文件）
-├── autotest-config.json    # 默认配置示例
-├── doc/
+d:\code\AutoTest
+├── .vscode/                # VSCode 配置
+│   ├── launch.json         # 调试配置
+│   └── tasks.json          # 任务配置
+├── dist/                   # webpack 打包输出
+│   └── extension.js
+├── doc/                    # 文档
 │   ├── Design.md           # 设计总览
 │   ├── FUNCTIONS.md        # 功能使用文档
 │   ├── config.md           # 配置模块详细文档
 │   ├── commandExecutor.md  # 命令执行模块详细文档
 │   ├── logMonitor.md       # 日志监控模块详细文档
-│   └── ai.md               # AI对话模块详细文档
-├── src/
+│   ├── ai.md               # AI对话模块详细文档
+│   └── ai-mode-design.md   # AI多模式架构设计
+├── resources/              # 资源文件
+│   └── icon.svg            # 插件图标
+├── src/                    # 源代码
 │   ├── types/index.ts      # 类型定义
 │   ├── config/index.ts     # 配置模块
 │   ├── core/               # 核心功能模块
 │   ├── ai/                 # AI 模块
 │   └── views/              # UI 视图
-└── test/
-    └── suite/              # 测试用例
+├── test/                   # 测试用例
+│   └── suite/              # 测试套件
+├── .gitignore
+├── .vscodeignore           # 打包排除配置
+├── DEVELOPMENT.md          # 本文档
+├── LICENSE
+├── README.md               # 项目说明
+├── autotest-config.json    # 默认配置示例
+├── package.json            # 扩展配置
+├── tsconfig.json           # TypeScript 配置
+└── webpack.config.js       # webpack 配置
 ```
 
 ## 版本历史
@@ -346,3 +304,4 @@ d:\AutoTest
 | 版本 | 日期 | 说明 |
 |------|------|------|
 | 1.0 | 2024-01-15 | 初始版本 |
+| 1.0.0 | 2024-02-15 | 添加 webpack 打包支持 |

@@ -21,6 +21,10 @@ export function activate(context: vscode.ExtensionContext) {
     aiChat = new AIChat();
     logTreeView = new LogTreeView();
 
+    fileUploader.setOnTestCaseComplete(() => {
+        logTreeView.refresh();
+    });
+
     setupConfigWatcher(context);
 
     onConfigChanged((newConfig) => {
@@ -31,9 +35,35 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     const commands = [
-        vscode.commands.registerCommand('autotest.uploadAndExecute', async () => {
+        vscode.commands.registerCommand('autotest.runTestCase', async (uri: vscode.Uri) => {
             try {
-                await fileUploader.uploadAndExecute();
+                if (!uri) {
+                    const activeEditor = vscode.window.activeTextEditor;
+                    if (activeEditor) {
+                        uri = activeEditor.document.uri;
+                    } else {
+                        vscode.window.showWarningMessage('请先选择一个文件或目录');
+                        return;
+                    }
+                }
+                await fileUploader.runTestCase(uri.fsPath);
+            } catch (error: any) {
+                vscode.window.showErrorMessage(`运行用例失败: ${error.message}`);
+            }
+        }),
+
+        vscode.commands.registerCommand('autotest.uploadFile', async (uri: vscode.Uri) => {
+            try {
+                if (!uri) {
+                    const activeEditor = vscode.window.activeTextEditor;
+                    if (activeEditor) {
+                        uri = activeEditor.document.uri;
+                    } else {
+                        vscode.window.showWarningMessage('请先选择一个文件或目录');
+                        return;
+                    }
+                }
+                await fileUploader.uploadFile(uri.fsPath);
             } catch (error: any) {
                 vscode.window.showErrorMessage(`上传失败: ${error.message}`);
             }

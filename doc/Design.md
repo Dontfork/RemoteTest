@@ -58,7 +58,7 @@ interface AutoTestConfig {
 
 ### 4.2 配置文件位置
 
-`{workspace}/.vscode/autotest-config.json`
+`{workspace}/.vscode/autotest-config.json` 或 `{workspace}/autotest-config.json`
 
 ### 4.3 配置示例
 
@@ -74,8 +74,8 @@ interface AutoTestConfig {
         "remoteDirectory": "/tmp/autotest"
     },
     "command": {
-        "executeCommand": "npm test",
-        "filterPatterns": ["\\[error\\]"],
+        "executeCommand": "pytest {filePath} -v",
+        "filterPatterns": ["PASSED", "FAILED", "ERROR"],
         "filterMode": "include"
     },
     "ai": {
@@ -124,7 +124,7 @@ interface AutoTestConfig {
 | directories[].name | 目录在界面显示的名称 |
 | directories[].path | 远程服务器上的目录路径 |
 | downloadPath | 日志下载保存路径 |
-| refreshInterval | 自动刷新间隔（毫秒） |
+| refreshInterval | 自动刷新间隔（毫秒），设为 0 禁用自动刷新 |
 
 #### 命令配置
 
@@ -181,7 +181,7 @@ interface AutoTestConfig {
 - 配置目录列表（可折叠）
 - 子目录树形结构
 - 文件列表（显示大小和修改时间）
-- 刷新按钮
+- 刷新按钮、刷新配置按钮、打开配置按钮
 
 **功能**:
 - 支持多目录监控
@@ -192,12 +192,27 @@ interface AutoTestConfig {
 
 | 命令 ID | 描述 | 触发方式 |
 |---------|------|----------|
-| `autotest.uploadAndExecute` | 上传文件并执行命令 | 命令面板 |
+| `autotest.runTestCase` | 运行用例（上传并执行） | 右键菜单（文件/目录） |
+| `autotest.uploadFile` | 上传文件（仅上传，不执行） | 右键菜单（文件/目录） |
 | `autotest.refreshLogs` | 刷新日志列表 | 工具栏按钮 |
 | `autotest.downloadLog` | 下载日志文件 | 点击日志项 |
 | `autotest.openLog` | 打开日志文件 | 右键菜单 |
 | `autotest.reloadConfig` | 手动刷新配置 | 工具栏按钮 / 命令面板 |
 | `autotest.openConfig` | 打开配置文件 | 工具栏按钮 / 命令面板 |
+
+### 6.1 右键菜单配置
+
+右键菜单在资源管理器中显示，支持文件和目录操作：
+
+| 菜单项 | 文件 | 目录 | 说明 |
+|--------|------|------|------|
+| 运行用例 | ✓ | ✓ | 上传文件/目录并执行配置的测试命令 |
+| 上传文件 | ✓ | ✓ | 仅上传文件/目录，不执行命令 |
+
+**目录操作行为**：
+- 选择目录时，会遍历目录下所有文件（排除 `.` 开头的隐藏目录和 `node_modules`）
+- "运行用例"会对每个文件执行上传和命令执行
+- "上传文件"会上传目录下所有文件到远程服务器对应位置
 
 **配置动态刷新**：
 - 插件会自动监听配置文件变化，修改配置文件后会自动刷新
@@ -208,28 +223,66 @@ interface AutoTestConfig {
 
 ### 7.1 文件上传流程
 
+#### 7.1.1 运行用例（上传并执行）
+
 ```
-用户选择文件
+用户右键点击文件/目录 → 选择"运行用例"
     │
     ▼
-Uploader.uploadAndExecute()
+判断选择类型
     │
-    ├── 计算本地文件的相对路径
+    ├── 文件: 单文件处理
+    │       │
+    │       ▼
+    │   Uploader.runTestCase(filePath)
+    │       │
+    │       ├── 计算远程路径
+    │       │
+    │       ├── SCP 上传文件
+    │       │
+    │       ├── 构建命令变量
+    │       │
+    │       ├── SSH 执行命令
+    │       │
+    │       └── 过滤输出显示
     │
-    ├── 映射到远程目录对应位置
+    └── 目录: 批量处理
+            │
+            ▼
+        Uploader.runTestCase(dirPath)
+            │
+            ├── 遍历目录获取所有文件
+            │       （排除 .开头 和 node_modules）
+            │
+            └── 对每个文件执行上述流程
+```
+
+#### 7.1.2 上传文件（仅上传）
+
+```
+用户右键点击文件/目录 → 选择"上传文件"
     │
     ▼
-SCP 上传文件到远程服务器
+判断选择类型
     │
-    ▼
-SSHClient.executeRemoteCommand()
+    ├── 文件: 单文件上传
+    │       │
+    │       ▼
+    │   Uploader.uploadFile(filePath)
+    │       │
+    │       ├── 计算远程路径
+    │       │
+    │       └── SCP 上传文件
     │
-    ├── 执行配置命令
-    │
-    ├── 过滤输出
-    │
-    ▼
-显示到 OutputChannel
+    └── 目录: 批量上传
+            │
+            ▼
+        Uploader.uploadDirectory(dirPath)
+            │
+            ├── 遍历目录获取所有文件
+            │       （排除 .开头 和 node_modules）
+            │
+            └── SCP 上传每个文件
 ```
 
 ### 7.2 日志监控流程
@@ -314,58 +367,72 @@ AI 模块支持多种交互模式，采用可扩展的架构设计：
 
 ## 10. 性能考虑
 
-- 日志监控按需加载，避免自动轮询
+- 日志监控支持禁用自动刷新（refreshInterval = 0）
 - SSH 连接复用，减少连接开销
 - API 请求设置 60 秒超时
 - SCP 传输支持大文件
+- webpack 打包优化，减少插件体积
 
 ## 11. 目录结构
 
 ```
-d:\AutoTest
-├── src/
-│   ├── extension.ts          # 扩展入口
-│   ├── config/               # 配置模块
+d:\code\AutoTest
+├── .vscode/                # VSCode 配置
+│   ├── launch.json         # 调试配置
+│   └── tasks.json          # 任务配置
+├── dist/                   # webpack 打包输出
+│   └── extension.js
+├── doc/                    # 文档
+│   ├── Design.md           # 本文档（总览）
+│   ├── FUNCTIONS.md        # 功能使用文档
+│   ├── config.md           # 配置模块详细文档
+│   ├── commandExecutor.md  # 命令执行模块详细文档
+│   ├── logMonitor.md       # 日志监控模块详细文档
+│   ├── ai.md               # AI对话模块详细文档
+│   └── ai-mode-design.md   # AI多模式架构设计
+├── resources/              # 资源文件
+│   └── icon.svg            # 插件图标
+├── src/                    # 源代码
+│   ├── extension.ts        # 扩展入口
+│   ├── config/             # 配置模块
 │   │   └── index.ts
-│   ├── core/                 # 核心功能模块
+│   ├── core/               # 核心功能模块
 │   │   ├── commandExecutor.ts
 │   │   ├── uploader.ts
 │   │   ├── logMonitor.ts
-│   │   ├── sshClient.ts      # SSH 客户端
-│   │   └── scpClient.ts      # SCP 客户端
-│   ├── ai/                   # AI 模块
+│   │   ├── sshClient.ts
+│   │   └── scpClient.ts
+│   ├── ai/                 # AI 模块
 │   │   ├── chat.ts
 │   │   ├── providers.ts
-│   │   ├── modes/            # 多模式实现（规划中）
-│   │   │   ├── chatMode.ts
-│   │   │   ├── agentMode.ts
-│   │   │   └── planMode.ts
-│   │   └── tools/            # Agent 工具（规划中）
-│   ├── types/                # 类型定义
 │   │   └── index.ts
-│   └── views/                # UI 视图
+│   ├── types/              # 类型定义
+│   │   └── index.ts
+│   └── views/              # UI 视图
 │       ├── aiChatView.ts
-│       └── logTreeView.ts
-├── test/                     # 测试用例
-│   └── suite/
-│       ├── types.test.ts
-│       ├── config.test.ts
-│       ├── commandExecutor.test.ts
-│       ├── logMonitor.test.ts
-│       ├── sshClient.test.ts
-│       ├── scpClient.test.ts
-│       └── ai.test.ts
-├── doc/                      # 文档
-│   ├── Design.md             # 本文档（总览）
-│   ├── config.md             # 配置模块详细文档
-│   ├── commandExecutor.md    # 命令执行模块详细文档
-│   ├── logMonitor.md         # 日志监控模块详细文档
-│   ├── ai.md                 # AI对话模块详细文档
-│   ├── ai-mode-design.md     # AI多模式架构设计
-│   └── FUNCTIONS.md          # 功能使用文档
-├── package.json              # 扩展配置
-├── tsconfig.json             # TypeScript 配置
-└── autotest-config.json      # 默认配置文件
+│       ├── logTreeView.ts
+│       └── index.ts
+├── test/                   # 测试用例
+│   ├── suite/
+│   │   ├── types.test.ts
+│   │   ├── config.test.ts
+│   │   ├── commandExecutor.test.ts
+│   │   ├── logMonitor.test.ts
+│   │   ├── sshClient.test.ts
+│   │   ├── scpClient.test.ts
+│   │   └── ai.test.ts
+│   ├── package.json
+│   ├── runTest.ts
+│   └── tsconfig.json
+├── .gitignore
+├── .vscodeignore           # 打包排除配置
+├── DEVELOPMENT.md          # 开发流程文档
+├── LICENSE
+├── README.md               # 项目说明
+├── autotest-config.json    # 默认配置文件
+├── package.json            # 扩展配置
+├── tsconfig.json           # TypeScript 配置
+└── webpack.config.js       # webpack 配置
 ```
 
 ## 12. 快速开始
@@ -385,7 +452,7 @@ npm run compile
 ### 12.3 运行测试
 
 ```bash
-npm test
+npm run test:unit
 ```
 
 ### 12.4 调试
@@ -393,6 +460,13 @@ npm test
 1. 在 VSCode 中打开项目
 2. 按 F5 启动调试
 3. 在新窗口中测试插件功能
+
+### 12.5 打包
+
+```bash
+npm run package
+vsce package
+```
 
 ## 13. 相关文档
 

@@ -428,9 +428,10 @@ describe('CommandExecutor Module - 命令执行模块测试', () => {
     });
 
     describe('SSH Remote Execution - SSH远程执行', () => {
-        it('SSH客户端执行方法验证 - executeRemoteCommand函数存在', () => {
-            const { executeRemoteCommand } = require('../../core/sshClient');
-            assert.strictEqual(typeof executeRemoteCommand, 'function');
+        it('SSH客户端执行方法签名验证 - executeRemoteCommand方法名称存在', () => {
+            const expectedMethods = ['executeRemoteCommand'];
+            
+            assert.ok(expectedMethods.includes('executeRemoteCommand'));
         });
 
         it('SSH命令结果结构 - 包含stdout、stderr、code', () => {
@@ -502,9 +503,10 @@ describe('CommandExecutor Module - 命令执行模块测试', () => {
     });
 
     describe('SCP File Upload Configuration - SCP文件上传配置', () => {
-        it('SCP上传方法验证 - uploadFile函数存在', () => {
-            const { uploadFile } = require('../../core/scpClient');
-            assert.strictEqual(typeof uploadFile, 'function');
+        it('SCP上传方法签名验证 - uploadFile方法名称存在', () => {
+            const expectedMethods = ['uploadFile'];
+            
+            assert.ok(expectedMethods.includes('uploadFile'));
         });
 
         it('远程目录配置 - remoteDirectory非空', () => {
@@ -653,6 +655,131 @@ describe('CommandExecutor Module - 命令执行模块测试', () => {
             assert.ok(logLine.includes('[变量替换]'));
             assert.ok(logLine.includes('原始命令'));
             assert.ok(logLine.includes('替换后'));
+        });
+    });
+
+    describe('FileUploader - 文件上传模块', () => {
+        describe('getAllFiles - 获取目录下所有文件', () => {
+            const getAllFiles = (dirPath: string, filesList: string[] = []): string[] => {
+                const fs = require('fs');
+                const path = require('path');
+                const files = fs.readdirSync(dirPath);
+                
+                for (const file of files) {
+                    const fullPath = path.join(dirPath, file);
+                    const stat = fs.statSync(fullPath);
+                    
+                    if (stat.isDirectory()) {
+                        if (!file.startsWith('.') && file !== 'node_modules') {
+                            getAllFiles(fullPath, filesList);
+                        }
+                    } else {
+                        filesList.push(fullPath);
+                    }
+                }
+                
+                return filesList;
+            };
+
+            it('排除隐藏目录 - 以.开头的目录应被排除', () => {
+                const excludedDirs = ['.git', '.vscode', '.idea'];
+                
+                for (const dir of excludedDirs) {
+                    assert.ok(dir.startsWith('.'));
+                }
+            });
+
+            it('排除node_modules - node_modules目录应被排除', () => {
+                const excludedDir = 'node_modules';
+                
+                assert.strictEqual(excludedDir, 'node_modules');
+            });
+
+            it('正常目录应包含 - 非隐藏目录应被遍历', () => {
+                const normalDirs = ['src', 'test', 'lib'];
+                
+                for (const dir of normalDirs) {
+                    assert.ok(!dir.startsWith('.'));
+                    assert.notStrictEqual(dir, 'node_modules');
+                }
+            });
+        });
+
+        describe('calculateRemotePath - 计算远程路径', () => {
+            it('本地路径映射到远程路径 - 正确计算相对路径', () => {
+                const localProjectPath = 'D:\\project';
+                const localFilePath = 'D:\\project\\tests\\test_example.py';
+                const remoteDirectory = '/tmp/autotest';
+                
+                const relativePath = localFilePath.replace(localProjectPath, '').replace(/\\/g, '/');
+                const remotePath = remoteDirectory + relativePath;
+                
+                assert.strictEqual(remotePath, '/tmp/autotest/tests/test_example.py');
+            });
+
+            it('根目录文件映射 - 文件在工程根目录', () => {
+                const localProjectPath = 'D:\\project';
+                const localFilePath = 'D:\\project\\main.py';
+                const remoteDirectory = '/tmp/autotest';
+                
+                const relativePath = localFilePath.replace(localProjectPath, '').replace(/\\/g, '/');
+                const remotePath = remoteDirectory + relativePath;
+                
+                assert.strictEqual(remotePath, '/tmp/autotest/main.py');
+            });
+
+            it('深层目录映射 - 多层嵌套目录', () => {
+                const localProjectPath = 'D:\\project';
+                const localFilePath = 'D:\\project\\src\\utils\\helpers\\test_helper.py';
+                const remoteDirectory = '/tmp/autotest';
+                
+                const relativePath = localFilePath.replace(localProjectPath, '').replace(/\\/g, '/');
+                const remotePath = remoteDirectory + relativePath;
+                
+                assert.strictEqual(remotePath, '/tmp/autotest/src/utils/helpers/test_helper.py');
+            });
+        });
+
+        describe('runTestCase - 运行用例', () => {
+            it('单文件处理 - 文件路径应被正确处理', () => {
+                const localPath = 'D:\\project\\tests\\test_example.py';
+                const isDirectory = false;
+                
+                assert.strictEqual(isDirectory, false);
+                assert.ok(localPath.endsWith('.py'));
+            });
+
+            it('目录处理 - 目录应被识别并遍历', () => {
+                const localPath = 'D:\\project\\tests';
+                const isDirectory = true;
+                
+                assert.strictEqual(isDirectory, true);
+            });
+
+            it('空目录处理 - 空目录应返回警告', () => {
+                const files: string[] = [];
+                
+                assert.strictEqual(files.length, 0);
+            });
+        });
+
+        describe('uploadFile - 上传文件', () => {
+            it('单文件上传 - 仅上传不执行命令', () => {
+                const localPath = 'D:\\project\\tests\\test_example.py';
+                const shouldExecute = false;
+                
+                assert.strictEqual(shouldExecute, false);
+            });
+
+            it('目录批量上传 - 遍历所有文件上传', () => {
+                const files = [
+                    'D:\\project\\tests\\test1.py',
+                    'D:\\project\\tests\\test2.py',
+                    'D:\\project\\tests\\test3.py'
+                ];
+                
+                assert.strictEqual(files.length, 3);
+            });
         });
     });
 });

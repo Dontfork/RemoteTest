@@ -12,8 +12,20 @@ export class LogMonitor {
     private logFilesCache: Map<string, LogFile[]> = new Map();
 
     constructor() {
+        this.updateRefreshInterval();
+    }
+
+    private updateRefreshInterval(): void {
         const config = getConfig();
         this.refreshInterval = config.logs.refreshInterval;
+    }
+
+    getRefreshInterval(): number {
+        return this.refreshInterval;
+    }
+
+    isAutoRefreshEnabled(): boolean {
+        return this.refreshInterval > 0;
     }
 
     getDirectories(): LogDirectoryConfig[] {
@@ -56,12 +68,14 @@ export class LogMonitor {
             onChange(files);
         });
 
-        this.monitorTimer = setInterval(async () => {
-            const files = await this.fetchAllDirectories();
-            if (this.onLogFilesChange) {
-                this.onLogFilesChange(files);
-            }
-        }, this.refreshInterval);
+        if (this.isAutoRefreshEnabled()) {
+            this.monitorTimer = setInterval(async () => {
+                const files = await this.fetchAllDirectories();
+                if (this.onLogFilesChange) {
+                    this.onLogFilesChange(files);
+                }
+            }, this.refreshInterval);
+        }
     }
 
     stopMonitoring(): void {

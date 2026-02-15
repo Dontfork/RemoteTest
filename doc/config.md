@@ -255,7 +255,7 @@ interface LogsConfig {
 | directories[].name | string | 是 | - | 目录在界面显示的名称 |
 | directories[].path | string | 是 | - | 远程服务器上的目录路径 |
 | downloadPath | string | 是 | "./downloads" | 日志下载保存路径 |
-| refreshInterval | number | 是 | 5000 | 自动刷新间隔，单位毫秒 |
+| refreshInterval | number | 是 | 5000 | 自动刷新间隔，单位毫秒。设为 0 或负数禁用自动刷新 |
 
 **日志监控功能**：
 
@@ -264,6 +264,8 @@ interface LogsConfig {
 - 显示文件大小和修改时间
 - 支持展开子目录
 - 点击文件可下载到本地
+- 自动刷新：`refreshInterval > 0` 时启用，设为 0 禁用自动刷新，仅支持手动刷新
+- 执行用例完成后自动刷新日志列表
 
 ## 4. 功能实现
 

@@ -4,10 +4,10 @@
 
 ## 功能特性
 
+- **文件上传**: 支持单文件和目录上传，右键菜单操作
+- **运行用例**: 上传文件并自动执行配置的测试命令
+- **日志监控**: 实时监控服务器日志，支持多目录、下载到本地
 - **AI 对话**: 支持多种 AI 提供商（QWen、OpenAI），可配置模型名称
-- **日志监控**: 实时监控服务器日志，支持下载到本地
-- **命令执行**: 执行终端命令并支持输出过滤
-- **文件上传**: 上传文件到服务器并自动执行配置命令
 
 ## 快速开始
 
@@ -35,6 +35,15 @@ npm run test:unit
 2. 按 F5 启动调试
 3. 在新窗口中测试插件功能
 
+### 打包
+
+```bash
+npm run package
+vsce package
+```
+
+生成的 `.vsix` 文件可直接安装到 VSCode。
+
 ## 配置
 
 在项目根目录创建 `.vscode/autotest-config.json` 文件：
@@ -46,14 +55,12 @@ npm run test:unit
     "port": 22,
     "username": "root",
     "password": "",
-    "uploadUrl": "http://192.168.1.100:8080/upload",
-    "executeCommand": "http://192.168.1.100:8080/execute",
-    "logDirectory": "/var/logs",
-    "downloadPath": "./downloads"
+    "privateKeyPath": "",
+    "remoteDirectory": "/tmp/autotest"
   },
   "command": {
-    "executeCommand": "npm test",
-    "filterPatterns": ["\\[error\\]"],
+    "executeCommand": "pytest {filePath} -v",
+    "filterPatterns": ["PASSED", "FAILED", "ERROR"],
     "filterMode": "include"
   },
   "ai": {
@@ -70,7 +77,10 @@ npm run test:unit
     }
   },
   "logs": {
-    "monitorDirectory": "/var/logs",
+    "directories": [
+      { "name": "应用日志", "path": "/var/log/myapp" },
+      { "name": "测试日志", "path": "/var/log/autotest" }
+    ],
     "downloadPath": "./downloads",
     "refreshInterval": 5000
   }
@@ -111,21 +121,43 @@ npm run test:unit
 ## 目录结构
 
 ```
-d:\AutoTest
+d:\code\AutoTest
+├── .vscode/                # VSCode 配置
+│   ├── launch.json         # 调试配置
+│   └── tasks.json          # 任务配置
+├── dist/                   # webpack 打包输出
+│   └── extension.js
+├── doc/                    # 文档
+│   ├── Design.md           # 设计文档
+│   ├── FUNCTIONS.md        # 功能文档
+│   ├── ai.md               # AI 模块文档
+│   ├── ai-mode-design.md   # AI 多模式设计
+│   ├── commandExecutor.md  # 命令执行文档
+│   ├── config.md           # 配置模块文档
+│   └── logMonitor.md       # 日志监控文档
+├── resources/              # 资源文件
+│   └── icon.svg            # 插件图标
 ├── src/                    # 源代码
-│   ├── extension.ts        # 扩展入口
+│   ├── ai/                 # AI 模块
 │   ├── config/             # 配置模块
 │   ├── core/               # 核心功能模块
-│   ├── ai/                 # AI 模块
 │   ├── types/              # 类型定义
-│   └── views/              # UI 视图
+│   ├── views/              # UI 视图
+│   └── extension.ts        # 扩展入口
 ├── test/                   # 测试用例
-├── doc/                    # 文档
+│   ├── suite/              # 测试套件
+│   ├── package.json
+│   ├── runTest.ts
+│   └── tsconfig.json
+├── .gitignore
+├── .vscodeignore           # 打包排除配置
+├── DEVELOPMENT.md          # 开发流程文档
+├── LICENSE
+├── README.md               # 本文档
+├── autotest-config.json    # 默认配置文件
 ├── package.json            # 扩展配置
 ├── tsconfig.json           # TypeScript 配置
-├── README.md               # 本文档
-├── DEVELOPMENT.md          # 开发流程文档
-└── autotest-config.json    # 默认配置文件
+└── webpack.config.js       # webpack 配置
 ```
 
 ## 许可证

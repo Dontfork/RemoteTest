@@ -1,5 +1,6 @@
 # 编译输出
 out/
+dist/
 
 # 依赖
 node_modules/
@@ -30,3 +31,7 @@ coverage/
 # 环境配置（如果包含敏感信息）
 .env
 .env.local
+
+# 打包输出
+*.vsix
+
