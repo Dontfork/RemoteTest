@@ -1,43 +1,58 @@
 import { getConfig } from '../config';
-import { AIMessage, AIResponse } from '../types';
+import { AIMessage, AIResponse, ChatSession } from '../types';
 import { QWenProvider, OpenAIProvider, AIProvider } from './providers';
+import { SessionManager } from './sessionManager';
 
 export class AIChat {
-    private messages: AIMessage[] = [];
     private provider: AIProvider;
+    private sessionManager: SessionManager;
 
-    constructor() {
+    constructor(sessionManager: SessionManager) {
+        this.sessionManager = sessionManager;
+        this.provider = this.createProvider();
+    }
+
+    private createProvider(): AIProvider {
         const config = getConfig();
         const aiConfig = config.ai;
 
         if (aiConfig.provider === 'qwen') {
-            this.provider = new QWenProvider(aiConfig.qwen);
+            return new QWenProvider(aiConfig.qwen);
         } else {
-            this.provider = new OpenAIProvider(aiConfig.openai);
+            return new OpenAIProvider(aiConfig.openai);
         }
     }
 
     setProvider(provider: 'qwen' | 'openai'): void {
-        const config = getConfig();
-        const aiConfig = config.ai;
+        this.provider = this.createProvider();
+    }
 
-        if (provider === 'qwen') {
-            this.provider = new QWenProvider(aiConfig.qwen);
-        } else {
-            this.provider = new OpenAIProvider(aiConfig.openai);
+    getCurrentSession(): ChatSession | null {
+        return this.sessionManager.getCurrentSession();
+    }
+
+    setCurrentSession(sessionId: string): ChatSession | null {
+        return this.sessionManager.setCurrentSession(sessionId);
+    }
+
+    getAllSessions(): ChatSession[] {
+        return this.sessionManager.getAllSessions();
+    }
+
+    createNewSession(): ChatSession {
+        return this.sessionManager.createSession();
+    }
+
+    deleteSession(sessionId: string): boolean {
+        return this.sessionManager.deleteSession(sessionId);
+    }
+
+    clearCurrentSession(): ChatSession | null {
+        const session = this.getCurrentSession();
+        if (session) {
+            return this.sessionManager.clearSession(session.id);
         }
-    }
-
-    addMessage(role: 'user' | 'assistant' | 'system', content: string): void {
-        this.messages.push({ role, content });
-    }
-
-    clearMessages(): void {
-        this.messages = [];
-    }
-
-    getMessages(): AIMessage[] {
-        return [...this.messages];
+        return null;
     }
 
     async sendMessage(userMessage: string): Promise<AIResponse> {
@@ -55,12 +70,17 @@ export class AIChat {
             return { content: '', error: '请配置 OpenAI API Key' };
         }
 
-        this.addMessage('user', userMessage);
+        let session = this.getCurrentSession();
+        if (!session) {
+            session = this.createNewSession();
+        }
 
-        const response = await this.provider.send(this.messages);
+        this.sessionManager.addMessage(session.id, { role: 'user', content: userMessage });
+
+        const response = await this.provider.send(session.messages);
 
         if (response.content && !response.error) {
-            this.addMessage('assistant', response.content);
+            this.sessionManager.addMessage(session.id, { role: 'assistant', content: response.content });
         }
 
         return response;
@@ -84,12 +104,17 @@ export class AIChat {
             return { content: '', error: '请配置 OpenAI API Key' };
         }
 
-        this.addMessage('user', userMessage);
+        let session = this.getCurrentSession();
+        if (!session) {
+            session = this.createNewSession();
+        }
 
-        const response = await this.provider.sendStream(this.messages, onChunk);
+        this.sessionManager.addMessage(session.id, { role: 'user', content: userMessage });
+
+        const response = await this.provider.sendStream(session.messages, onChunk);
 
         if (response.content && !response.error) {
-            this.addMessage('assistant', response.content);
+            this.sessionManager.addMessage(session.id, { role: 'assistant', content: response.content });
         }
 
         return response;

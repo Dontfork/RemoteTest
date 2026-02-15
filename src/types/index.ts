@@ -70,6 +70,14 @@ export interface AIResponse {
     error?: string;
 }
 
+export interface ChatSession {
+    id: string;
+    title: string;
+    messages: AIMessage[];
+    createdAt: number;
+    updatedAt: number;
+}
+
 export interface LogFile {
     name: string;
     path: string;

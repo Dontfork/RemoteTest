@@ -1,12 +1,13 @@
 import * as vscode from 'vscode';
 import { loadConfig, reloadConfig, setupConfigWatcher, onConfigChanged, dispose as disposeConfig } from './config';
 import { CommandExecutor, FileUploader } from './core';
-import { AIChat } from './ai';
+import { AIChat, SessionManager } from './ai';
 import { LogTreeView, LogTreeItem, AIChatViewProvider } from './views';
 
 let commandExecutor: CommandExecutor;
 let fileUploader: FileUploader;
 let aiChat: AIChat;
+let sessionManager: SessionManager;
 let logTreeView: LogTreeView;
 
 export function activate(context: vscode.ExtensionContext) {
@@ -18,7 +19,8 @@ export function activate(context: vscode.ExtensionContext) {
 
     commandExecutor = new CommandExecutor();
     fileUploader = new FileUploader(commandExecutor);
-    aiChat = new AIChat();
+    sessionManager = new SessionManager(context);
+    aiChat = new AIChat(sessionManager);
     logTreeView = new LogTreeView();
 
     fileUploader.setOnTestCaseComplete(() => {
@@ -119,7 +121,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     const aiChatView = vscode.window.registerWebviewViewProvider(
         AIChatViewProvider.viewType, 
-        new AIChatViewProvider(context.extensionUri, aiChat)
+        new AIChatViewProvider(context.extensionUri, aiChat, sessionManager)
     );
 
     context.subscriptions.push(...commands, aiChatView);
@@ -135,6 +137,9 @@ export function deactivate() {
     }
     if (commandExecutor) {
         commandExecutor.dispose();
+    }
+    if (sessionManager) {
+        sessionManager.dispose();
     }
     disposeConfig();
 }
