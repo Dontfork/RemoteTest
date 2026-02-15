@@ -3,12 +3,19 @@
     "tasks": [
         {
             "type": "npm",
-            "script": "compile",
+            "script": "webpack-dev",
             "problemMatcher": [],
             "group": {
                 "kind": "build",
                 "isDefault": true
             },
+            "label": "npm: webpack-dev"
+        },
+        {
+            "type": "npm",
+            "script": "compile",
+            "problemMatcher": [],
+            "group": "build",
             "label": "npm: compile"
         }
     ]
