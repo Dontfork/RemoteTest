@@ -167,7 +167,7 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         .bubble em { color: #d0d0d0; }
         .input-area { padding: 10px 12px; border-top: 1px solid #3c3c3c; background: transparent; }
         .input-wrap { display: flex; gap: 8px; align-items: flex-end; }
-        textarea { flex: 1; padding: 0 0 1px 0; background: transparent; color: #cccccc; border: none; border-bottom: 1px solid #3c3c3c; resize: none; font-family: inherit; font-size: 14px; line-height: 20px; height: 21px; }
+        textarea { flex: 1; padding: 0 0 2px 0; background: transparent; color: #cccccc; border: none; border-bottom: 1px solid #3c3c3c; resize: none; font-family: inherit; font-size: 14px; line-height: 20px; height: 22px; }
         textarea:focus { outline: none; border-bottom-color: #858585; }
         button#sendBtn { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; background: transparent; color: #858585; border: none; cursor: pointer; transition: all 0.2s; flex-shrink: 0; margin-bottom: 1px; }
         button#sendBtn:hover { color: #cccccc; }
