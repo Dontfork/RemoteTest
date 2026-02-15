@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { AIChat } from '../ai';
 import { SessionManager } from '../ai/sessionManager';
 import { ChatSession } from '../types';
+import { log, logError } from '../utils/logger';
 
 export class AIChatViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'autotest-ai-view';
@@ -92,23 +93,32 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
     }
 
     private async handleSendMessage(userMessage: string): Promise<void> {
+        log(`[AIChatView] handleSendMessage 开始, 消息: "${userMessage.substring(0, 50)}..."`);
+        
         try {
             let fullContent = '';
+            let chunkCount = 0;
             
             const response = await this.aiChat.sendMessageStream(userMessage, (chunk) => {
                 fullContent += chunk;
+                chunkCount++;
+                log(`[AIChatView] 收到 chunk #${chunkCount}, 长度: ${chunk.length}`);
                 this.view?.webview.postMessage({
                     command: 'streamChunk',
                     data: chunk
                 });
             });
 
+            log(`[AIChatView] sendStream 完成, 总 chunks: ${chunkCount}, 总长度: ${fullContent.length}`);
+
             if (response.error) {
+                logError('[AIChatView] 响应包含错误', response.error);
                 this.view?.webview.postMessage({
                     command: 'streamError',
                     error: response.error
                 });
             } else {
+                log('[AIChatView] 发送 streamComplete');
                 this.view?.webview.postMessage({
                     command: 'streamComplete',
                     data: fullContent
@@ -116,6 +126,7 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
                 this.sendSessions();
             }
         } catch (error: any) {
+            logError('[AIChatView] handleSendMessage 异常', error.message);
             this.view?.webview.postMessage({
                 command: 'streamError',
                 error: error.message
@@ -149,75 +160,55 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         .session-delete { width: 20px; height: 20px; border: none; background: transparent; cursor: pointer; opacity: 0.5; display: flex; align-items: center; justify-content: center; color: var(--vscode-foreground); font-size: 14px; }
         .session-delete:hover { opacity: 1; color: #f66; }
         
-        .messages { flex: 1; overflow-y: auto; padding: 16px; }
-        .msg { margin-bottom: 12px; display: flex; }
-        .msg.user { justify-content: flex-end; }
-        .msg.assistant { justify-content: flex-start; }
-        .bubble { max-width: 90%; padding: 10px 14px; border-radius: 8px; font-size: 13px; line-height: 1.6; overflow-wrap: break-word; }
-        .msg.user .bubble { background: var(--vscode-editor-inactiveSelectionBackground); }
-        .msg.assistant .bubble { background: var(--vscode-editor-background); border: 1px solid var(--vscode-input-border); }
-        .msg.error .bubble { background: transparent; border: 1px solid rgba(255,100,100,0.3); color: #f66; }
-        .input-box { padding: 8px 12px; border-top: 1px solid var(--vscode-input-border); display: flex; gap: 8px; align-items: center; }
-        .input-box input { flex: 1; padding: 8px 12px; border: none; background: transparent; font-size: 13px; color: var(--vscode-input-foreground); outline: none; }
-        .input-box input::placeholder { color: var(--vscode-input-placeholderForeground); }
-        .send-btn { width: 28px; height: 28px; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0.7; }
-        .send-btn:hover { opacity: 1; }
-        .send-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-        .send-btn svg { width: 18px; height: 18px; fill: var(--vscode-foreground); }
-        .welcome { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--vscode-descriptionForeground); text-align: center; }
-        .welcome-icon { font-size: 28px; margin-bottom: 8px; opacity: 0.6; }
-        .welcome-text { font-size: 13px; }
-        .streaming .bubble { border-left: 3px solid var(--vscode-progressBar-background); }
+        .messages { flex: 1; overflow-y: auto; padding: 12px; }
+        .welcome { text-align: center; padding: 40px 20px; color: var(--vscode-descriptionForeground); }
+        .welcome h2 { margin-bottom: 12px; color: var(--vscode-foreground); }
+        .msg { margin-bottom: 12px; }
+        .bubble { padding: 10px 14px; border-radius: 12px; max-width: 100%; word-wrap: break-word; line-height: 1.5; }
+        .user .bubble { background: var(--vscode-button-background); color: var(--vscode-button-foreground); margin-left: auto; }
+        .assistant .bubble { background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border); }
+        .error .bubble { background: rgba(255,0,0,0.1); border: 1px solid rgba(255,0,0,0.3); color: #f66; }
+        .streaming .bubble { opacity: 0.8; }
+        .cursor { animation: blink 1s infinite; }
+        @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
         
-        .md-content p { margin: 0 0 8px 0; }
-        .md-content p:last-child { margin-bottom: 0; }
-        .md-content code { background: var(--vscode-textCodeBlock-background); padding: 2px 6px; border-radius: 4px; font-family: var(--vscode-editor-font-family); font-size: 12px; }
         .md-content pre { background: var(--vscode-textCodeBlock-background); padding: 12px; border-radius: 6px; overflow-x: auto; margin: 8px 0; }
-        .md-content pre code { background: none; padding: 0; font-size: 12px; line-height: 1.5; }
-        .md-content ul, .md-content ol { margin: 8px 0; padding-left: 20px; }
+        .md-content code { font-family: var(--vscode-editor-font-family); font-size: 12px; }
+        .md-content p code { background: var(--vscode-textCodeBlock-background); padding: 2px 6px; border-radius: 4px; }
+        .md-content h1, .md-content h2, .md-content h3 { margin: 12px 0 8px; }
+        .md-content ul { margin: 8px 0; padding-left: 20px; }
         .md-content li { margin: 4px 0; }
-        .md-content h1, .md-content h2, .md-content h3, .md-content h4 { margin: 12px 0 8px 0; font-weight: 600; }
-        .md-content h1 { font-size: 18px; }
-        .md-content h2 { font-size: 16px; }
-        .md-content h3 { font-size: 14px; }
-        .md-content h4 { font-size: 13px; }
         .md-content blockquote { border-left: 3px solid var(--vscode-input-border); padding-left: 12px; margin: 8px 0; color: var(--vscode-descriptionForeground); }
-        .md-content strong { font-weight: 600; }
-        .md-content em { font-style: italic; }
-        .md-content a { color: var(--vscode-textLink-foreground); text-decoration: none; }
+        .md-content a { color: var(--vscode-textLink-foreground); }
         .md-content a:hover { text-decoration: underline; }
-        .md-content hr { border: none; border-top: 1px solid var(--vscode-input-border); margin: 12px 0; }
-        .md-content table { border-collapse: collapse; margin: 8px 0; width: 100%; }
-        .md-content th, .md-content td { border: 1px solid var(--vscode-input-border); padding: 6px 10px; text-align: left; }
-        .md-content th { background: var(--vscode-editor-inactiveSelectionBackground); font-weight: 600; }
         
-        .hidden { display: none !important; }
+        .input-area { padding: 12px; border-top: 1px solid var(--vscode-input-border); }
+        .input-wrap { display: flex; gap: 8px; }
+        textarea { flex: 1; resize: none; border: 1px solid var(--vscode-input-border); background: var(--vscode-input-background); color: var(--vscode-input-foreground); border-radius: 6px; padding: 10px; font-family: inherit; font-size: 13px; min-height: 60px; max-height: 150px; }
+        textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
+        button { padding: 10px 16px; border: none; background: var(--vscode-button-background); color: var(--vscode-button-foreground); cursor: pointer; border-radius: 6px; font-size: 13px; }
+        button:hover { background: var(--vscode-button-hoverBackground); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
     </style>
 </head>
 <body>
     <div class="chat">
         <div class="toolbar">
-            <button class="toolbar-btn" id="newBtn" title="新建会话">
-                <span>+</span> 新建会话
-            </button>
-            <button class="toolbar-btn" id="toggleSessions" title="切换会话">
-                <span>☰</span> 会话列表
-            </button>
+            <button id="newBtn" class="toolbar-btn">+ 新对话</button>
+            <button id="toggleSessions" class="toolbar-btn">历史</button>
         </div>
-        
-        <div class="session-list hidden" id="sessionList"></div>
-        
-        <div class="messages" id="messages">
+        <div id="sessionList" class="session-list hidden"></div>
+        <div id="messages" class="messages">
             <div class="welcome">
-                <div class="welcome-icon">💬</div>
-                <div class="welcome-text">开始对话</div>
+                <h2>AutoTest AI 助手</h2>
+                <p>输入问题开始对话</p>
             </div>
         </div>
-        <div class="input-box">
-            <input type="text" id="input" placeholder="输入消息...">
-            <button class="send-btn" id="sendBtn">
-                <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-            </button>
+        <div class="input-area">
+            <div class="input-wrap">
+                <textarea id="input" placeholder="输入消息..." rows="2"></textarea>
+                <button id="sendBtn">发送</button>
+            </div>
         </div>
     </div>
     <script>
@@ -382,14 +373,13 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         
         function loadSession(session) {
             messages.innerHTML = '';
-            if (!session || !session.messages || session.messages.length === 0) {
-                messages.innerHTML = '<div class="welcome"><div class="welcome-icon">💬</div><div class="welcome-text">开始对话</div></div>';
-                return;
+            if (session && session.messages && session.messages.length > 0) {
+                session.messages.forEach(m => {
+                    addMsg(m.role, m.content);
+                });
+            } else {
+                messages.innerHTML = '<div class="welcome"><h2>AutoTest AI 助手</h2><p>输入问题开始对话</p></div>';
             }
-            
-            session.messages.forEach(m => {
-                addMsg(m.role, m.content);
-            });
         }
         
         sendBtn.onclick = send;

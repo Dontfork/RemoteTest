@@ -3,6 +3,7 @@ import { loadConfig, reloadConfig, setupConfigWatcher, onConfigChanged, dispose 
 import { CommandExecutor, FileUploader } from './core';
 import { AIChat, SessionManager } from './ai';
 import { LogTreeView, LogTreeItem, AIChatViewProvider } from './views';
+import { initLogger } from './utils/logger';
 
 let commandExecutor: CommandExecutor;
 let fileUploader: FileUploader;
@@ -18,6 +19,8 @@ export function activate(context: vscode.ExtensionContext) {
     }
 
     commandExecutor = new CommandExecutor();
+    initLogger(commandExecutor.getPluginChannel());
+    
     fileUploader = new FileUploader(commandExecutor);
     sessionManager = new SessionManager(context);
     aiChat = new AIChat(sessionManager);
