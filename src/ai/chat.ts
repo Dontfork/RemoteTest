@@ -65,4 +65,33 @@ export class AIChat {
 
         return response;
     }
+
+    async sendMessageStream(
+        userMessage: string, 
+        onChunk: (chunk: string) => void
+    ): Promise<AIResponse> {
+        const config = getConfig();
+        
+        if (!config.ai) {
+            return { content: '', error: '请先配置 AI 服务' };
+        }
+
+        if (config.ai.provider === 'qwen' && !config.ai.qwen?.apiKey) {
+            return { content: '', error: '请配置 QWen API Key' };
+        }
+
+        if (config.ai.provider === 'openai' && !config.ai.openai?.apiKey) {
+            return { content: '', error: '请配置 OpenAI API Key' };
+        }
+
+        this.addMessage('user', userMessage);
+
+        const response = await this.provider.sendStream(this.messages, onChunk);
+
+        if (response.content && !response.error) {
+            this.addMessage('assistant', response.content);
+        }
+
+        return response;
+    }
 }

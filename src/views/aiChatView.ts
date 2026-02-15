@@ -41,16 +41,30 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
 
     private async handleSendMessage(userMessage: string): Promise<void> {
         try {
-            const response = await this.aiChat.sendMessage(userMessage);
-            this.view?.webview.postMessage({
-                command: 'aiResponse',
-                data: response.content,
-                error: response.error
+            let fullContent = '';
+            
+            const response = await this.aiChat.sendMessageStream(userMessage, (chunk) => {
+                fullContent += chunk;
+                this.view?.webview.postMessage({
+                    command: 'streamChunk',
+                    data: chunk
+                });
             });
+
+            if (response.error) {
+                this.view?.webview.postMessage({
+                    command: 'streamError',
+                    error: response.error
+                });
+            } else {
+                this.view?.webview.postMessage({
+                    command: 'streamComplete',
+                    data: fullContent
+                });
+            }
         } catch (error: any) {
             this.view?.webview.postMessage({
-                command: 'aiResponse',
-                data: '',
+                command: 'streamError',
                 error: error.message
             });
         }
@@ -85,11 +99,7 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         .welcome { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--vscode-descriptionForeground); text-align: center; }
         .welcome-icon { font-size: 28px; margin-bottom: 8px; opacity: 0.6; }
         .welcome-text { font-size: 13px; }
-        .typing { display: flex; gap: 3px; padding: 8px 12px; }
-        .typing span { width: 5px; height: 5px; background: var(--vscode-descriptionForeground); border-radius: 50%; opacity: 0.5; animation: pulse 1.2s infinite; }
-        .typing span:nth-child(2) { animation-delay: 0.2s; }
-        .typing span:nth-child(3) { animation-delay: 0.4s; }
-        @keyframes pulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.8; } }
+        .streaming .bubble { border-left: 3px solid var(--vscode-progressBar-background); }
         
         .md-content p { margin: 0 0 8px 0; }
         .md-content p:last-child { margin-bottom: 0; }
@@ -134,6 +144,8 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         const messages = document.getElementById('messages');
         const input = document.getElementById('input');
         const sendBtn = document.getElementById('sendBtn');
+        let streamingMsg = null;
+        let streamContent = '';
         
         function send() {
             const text = input.value.trim();
@@ -141,15 +153,13 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
             addMsg('user', text);
             input.value = '';
             sendBtn.disabled = true;
-            showTyping();
+            showStreamingMsg();
             vscode.postMessage({ command: 'sendMessage', data: text });
         }
         
         function addMsg(role, content) {
             const w = messages.querySelector('.welcome');
             if (w) w.remove();
-            const t = messages.querySelector('.typing');
-            if (t) t.parentElement.remove();
             const d = document.createElement('div');
             d.className = 'msg ' + role;
             if (role === 'assistant') {
@@ -161,14 +171,48 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
             }
             messages.appendChild(d);
             messages.scrollTop = messages.scrollHeight;
+            return d;
         }
         
-        function showTyping() {
+        function showStreamingMsg() {
+            streamContent = '';
             const d = document.createElement('div');
-            d.className = 'msg assistant';
-            d.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+            d.className = 'msg assistant streaming';
+            d.innerHTML = '<div class="bubble md-content"><span class="cursor">▌</span></div>';
             messages.appendChild(d);
             messages.scrollTop = messages.scrollHeight;
+            streamingMsg = d;
+        }
+        
+        function updateStreamingMsg(chunk) {
+            streamContent += chunk;
+            if (streamingMsg) {
+                const bubble = streamingMsg.querySelector('.bubble');
+                if (bubble) {
+                    bubble.innerHTML = renderMarkdown(streamContent) + '<span class="cursor">▌</span>';
+                    messages.scrollTop = messages.scrollHeight;
+                }
+            }
+        }
+        
+        function completeStreamingMsg(content) {
+            if (streamingMsg) {
+                streamingMsg.classList.remove('streaming');
+                const bubble = streamingMsg.querySelector('.bubble');
+                if (bubble) {
+                    bubble.innerHTML = renderMarkdown(content || streamContent);
+                }
+            }
+            streamingMsg = null;
+            streamContent = '';
+        }
+        
+        function showError(error) {
+            if (streamingMsg) {
+                streamingMsg.remove();
+                streamingMsg = null;
+            }
+            addMsg('error', error);
         }
         
         function esc(t) { 
@@ -221,11 +265,18 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         
         window.onmessage = e => {
             const m = e.data;
-            sendBtn.disabled = false;
-            if (m.command === 'aiResponse') {
-                const t = messages.querySelector('.typing');
-                if (t) t.parentElement.remove();
-                addMsg(m.error ? 'error' : 'assistant', m.error || m.data);
+            if (m.command === 'streamChunk') {
+                updateStreamingMsg(m.data);
+            } else if (m.command === 'streamComplete') {
+                completeStreamingMsg(m.data);
+                sendBtn.disabled = false;
+            } else if (m.command === 'streamError') {
+                showError(m.error);
+                sendBtn.disabled = false;
+            } else if (m.command === 'chatCleared') {
+                messages.innerHTML = '<div class="welcome"><div class="welcome-icon">💬</div><div class="welcome-text">开始对话</div></div>';
+                streamingMsg = null;
+                streamContent = '';
             }
         };
     </script>
