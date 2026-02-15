@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { getConfig } from '../config';
 import { AIMessage, AIResponse, QWenConfig, OpenAIConfig } from '../types';
 
 export interface AIProvider {
@@ -44,68 +43,66 @@ export class QWenProvider implements AIProvider {
         const model = this.config.model || 'qwen-turbo';
 
         try {
-            const response = await fetch(apiUrl, {
+            const response = await axios({
                 method: 'POST',
+                url: apiUrl,
                 headers: {
                     'Authorization': `Bearer ${this.config.apiKey}`,
                     'Content-Type': 'application/json',
+                    'Accept': 'text/event-stream',
                     'X-DashScope-SSE': 'enable'
                 },
-                body: JSON.stringify({
+                data: {
                     model: model,
                     input: { messages: messages.map(m => ({ role: m.role, content: m.content })) },
                     parameters: { 
                         result_format: 'message',
                         incremental_output: true
                     }
-                })
+                },
+                responseType: 'stream',
+                timeout: 120000
             });
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({})) as { message?: string };
-                throw new Error(errorData.message || `HTTP ${response.status}`);
-            }
+            return new Promise((resolve, reject) => {
+                let fullContent = '';
+                let buffer = '';
 
-            const reader = response.body?.getReader();
-            if (!reader) {
-                throw new Error('无法获取响应流');
-            }
+                response.data.on('data', (chunk: Buffer) => {
+                    buffer += chunk.toString('utf-8');
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
 
-            const decoder = new TextDecoder();
-            let fullContent = '';
-            let buffer = '';
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n');
-                buffer = lines.pop() || '';
-
-                for (const line of lines) {
-                    if (line.startsWith('data:')) {
-                        const data = line.slice(5).trim();
-                        if (data === '[DONE]') continue;
-                        
-                        try {
-                            const json = JSON.parse(data);
-                            const content = json?.output?.choices?.[0]?.message?.content || '';
-                            if (content && content.length > fullContent.length) {
-                                const chunk = content.slice(fullContent.length);
-                                fullContent = content;
-                                onChunk(chunk);
+                    for (const line of lines) {
+                        if (line.startsWith('data:')) {
+                            const data = line.slice(5).trim();
+                            if (data === '[DONE]') continue;
+                            
+                            try {
+                                const json = JSON.parse(data);
+                                const content = json?.output?.choices?.[0]?.message?.content || '';
+                                if (content && content.length > fullContent.length) {
+                                    const chunk = content.slice(fullContent.length);
+                                    fullContent = content;
+                                    onChunk(chunk);
+                                }
+                            } catch {
+                                // 忽略解析错误
                             }
-                        } catch {
-                            // 忽略解析错误
                         }
                     }
-                }
-            }
+                });
 
-            return { content: fullContent || 'AI 未返回有效响应' };
+                response.data.on('end', () => {
+                    resolve({ content: fullContent || 'AI 未返回有效响应' });
+                });
+
+                response.data.on('error', (err: Error) => {
+                    resolve({ content: '', error: err.message || '流式响应错误' });
+                });
+            });
         } catch (error: any) {
-            const errorMsg = error.message || '请求失败';
+            const errorMsg = error.response?.data?.message || error.message || '请求失败';
             return { content: '', error: errorMsg };
         }
     }
@@ -137,7 +134,7 @@ export class OpenAIProvider implements AIProvider {
             const content = response.data?.choices?.[0]?.message?.content || '';
             return { content: content || 'AI 未返回有效响应' };
         } catch (error: any) {
-            const errorMsg = error.response?.data?.message || error.message || '请求失败';
+            const errorMsg = error.response?.data?.error?.message || error.message || '请求失败';
             return { content: '', error: errorMsg };
         }
     }
@@ -147,63 +144,61 @@ export class OpenAIProvider implements AIProvider {
         const model = this.config.model || 'gpt-3.5-turbo';
 
         try {
-            const response = await fetch(apiUrl, {
+            const response = await axios({
                 method: 'POST',
+                url: apiUrl,
                 headers: {
                     'Authorization': `Bearer ${this.config.apiKey}`,
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Accept': 'text/event-stream'
                 },
-                body: JSON.stringify({
+                data: {
                     model: model,
                     messages: messages.map(m => ({ role: m.role, content: m.content })),
                     stream: true
-                })
+                },
+                responseType: 'stream',
+                timeout: 120000
             });
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({})) as { error?: { message?: string } };
-                throw new Error(errorData.error?.message || `HTTP ${response.status}`);
-            }
+            return new Promise((resolve, reject) => {
+                let fullContent = '';
+                let buffer = '';
 
-            const reader = response.body?.getReader();
-            if (!reader) {
-                throw new Error('无法获取响应流');
-            }
+                response.data.on('data', (chunk: Buffer) => {
+                    buffer += chunk.toString('utf-8');
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
 
-            const decoder = new TextDecoder();
-            let fullContent = '';
-            let buffer = '';
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n');
-                buffer = lines.pop() || '';
-
-                for (const line of lines) {
-                    if (line.startsWith('data:')) {
-                        const data = line.slice(5).trim();
-                        if (data === '[DONE]') continue;
-                        
-                        try {
-                            const json = JSON.parse(data);
-                            const delta = json?.choices?.[0]?.delta?.content || '';
-                            if (delta) {
-                                fullContent += delta;
-                                onChunk(delta);
+                    for (const line of lines) {
+                        if (line.startsWith('data:')) {
+                            const data = line.slice(5).trim();
+                            if (data === '[DONE]') continue;
+                            
+                            try {
+                                const json = JSON.parse(data);
+                                const delta = json?.choices?.[0]?.delta?.content || '';
+                                if (delta) {
+                                    fullContent += delta;
+                                    onChunk(delta);
+                                }
+                            } catch {
+                                // 忽略解析错误
                             }
-                        } catch {
-                            // 忽略解析错误
                         }
                     }
-                }
-            }
+                });
 
-            return { content: fullContent || 'AI 未返回有效响应' };
+                response.data.on('end', () => {
+                    resolve({ content: fullContent || 'AI 未返回有效响应' });
+                });
+
+                response.data.on('error', (err: Error) => {
+                    resolve({ content: '', error: err.message || '流式响应错误' });
+                });
+            });
         } catch (error: any) {
-            const errorMsg = error.message || '请求失败';
+            const errorMsg = error.response?.data?.error?.message || error.message || '请求失败';
             return { content: '', error: errorMsg };
         }
     }
