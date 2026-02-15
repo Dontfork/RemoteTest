@@ -302,11 +302,11 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         function renderMarkdown(text) {
             let html = esc(text);
             
-            html = html.replace(/```(\w*)\n([\s\S]*?)```/g, function(match, lang, code) {
+            html = html.replace(/\`\`\`(\w*)\n([\s\S]*?)\`\`\`/g, function(match, lang, code) {
                 return '<pre><code class="language-' + lang + '">' + code.trim() + '</code></pre>';
             });
             
-            html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+            html = html.replace(/\`([^\`]+)\`/g, '<code>$1</code>');
             
             html = html.replace(/\*\*([^\*]+)\*\*/g, '<strong>$1</strong>');
             html = html.replace(/\*([^\*]+)\*/g, '<em>$1</em>');
