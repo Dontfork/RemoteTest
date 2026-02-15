@@ -71,7 +71,7 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         .msg { margin-bottom: 12px; display: flex; }
         .msg.user { justify-content: flex-end; }
         .msg.assistant { justify-content: flex-start; }
-        .bubble { max-width: 75%; padding: 8px 12px; border-radius: 8px; font-size: 13px; line-height: 1.5; }
+        .bubble { max-width: 90%; padding: 10px 14px; border-radius: 8px; font-size: 13px; line-height: 1.6; overflow-wrap: break-word; }
         .msg.user .bubble { background: var(--vscode-editor-inactiveSelectionBackground); }
         .msg.assistant .bubble { background: var(--vscode-editor-background); border: 1px solid var(--vscode-input-border); }
         .msg.error .bubble { background: transparent; border: 1px solid rgba(255,100,100,0.3); color: #f66; }
@@ -90,6 +90,28 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         .typing span:nth-child(2) { animation-delay: 0.2s; }
         .typing span:nth-child(3) { animation-delay: 0.4s; }
         @keyframes pulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.8; } }
+        
+        .md-content p { margin: 0 0 8px 0; }
+        .md-content p:last-child { margin-bottom: 0; }
+        .md-content code { background: var(--vscode-textCodeBlock-background); padding: 2px 6px; border-radius: 4px; font-family: var(--vscode-editor-font-family); font-size: 12px; }
+        .md-content pre { background: var(--vscode-textCodeBlock-background); padding: 12px; border-radius: 6px; overflow-x: auto; margin: 8px 0; }
+        .md-content pre code { background: none; padding: 0; font-size: 12px; line-height: 1.5; }
+        .md-content ul, .md-content ol { margin: 8px 0; padding-left: 20px; }
+        .md-content li { margin: 4px 0; }
+        .md-content h1, .md-content h2, .md-content h3, .md-content h4 { margin: 12px 0 8px 0; font-weight: 600; }
+        .md-content h1 { font-size: 18px; }
+        .md-content h2 { font-size: 16px; }
+        .md-content h3 { font-size: 14px; }
+        .md-content h4 { font-size: 13px; }
+        .md-content blockquote { border-left: 3px solid var(--vscode-input-border); padding-left: 12px; margin: 8px 0; color: var(--vscode-descriptionForeground); }
+        .md-content strong { font-weight: 600; }
+        .md-content em { font-style: italic; }
+        .md-content a { color: var(--vscode-textLink-foreground); text-decoration: none; }
+        .md-content a:hover { text-decoration: underline; }
+        .md-content hr { border: none; border-top: 1px solid var(--vscode-input-border); margin: 12px 0; }
+        .md-content table { border-collapse: collapse; margin: 8px 0; width: 100%; }
+        .md-content th, .md-content td { border: 1px solid var(--vscode-input-border); padding: 6px 10px; text-align: left; }
+        .md-content th { background: var(--vscode-editor-inactiveSelectionBackground); font-weight: 600; }
     </style>
 </head>
 <body>
@@ -130,7 +152,13 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
             if (t) t.parentElement.remove();
             const d = document.createElement('div');
             d.className = 'msg ' + role;
-            d.innerHTML = '<div class="bubble">' + esc(content) + '</div>';
+            if (role === 'assistant') {
+                d.innerHTML = '<div class="bubble md-content">' + renderMarkdown(content) + '</div>';
+            } else if (role === 'error') {
+                d.innerHTML = '<div class="bubble">' + esc(content) + '</div>';
+            } else {
+                d.innerHTML = '<div class="bubble">' + esc(content) + '</div>';
+            }
             messages.appendChild(d);
             messages.scrollTop = messages.scrollHeight;
         }
@@ -143,7 +171,50 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
             messages.scrollTop = messages.scrollHeight;
         }
         
-        function esc(t) { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+        function esc(t) { 
+            return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); 
+        }
+        
+        function renderMarkdown(text) {
+            let html = esc(text);
+            
+            html = html.replace(/\`\`\`(\\w*)\\n([\\s\\S]*?)\`\`\`/g, function(match, lang, code) {
+                return '<pre><code class="language-' + lang + '">' + code.trim() + '</code></pre>';
+            });
+            
+            html = html.replace(/\`([^\`]+)\`/g, '<code>$1</code>');
+            
+            html = html.replace(/\*\*([^\*]+)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/\*([^\*]+)\*/g, '<em>$1</em>');
+            
+            html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+            html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+            html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+            
+            html = html.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
+            
+            html = html.replace(/^[-*] (.+)$/gm, '<li>$1</li>');
+            html = html.replace(/(<li>.*<\\/li>\\n?)+/g, '<ul>$&</ul>');
+            
+            html = html.replace(/\\[([^\\]]+)\\]\\(([^)]+)\\)/g, '<a href="$2">$1</a>');
+            
+            html = html.replace(/^---$/gm, '<hr>');
+            
+            html = html.replace(/\\n\\n/g, '</p><p>');
+            html = '<p>' + html + '</p>';
+            html = html.replace(/<p><\\/p>/g, '');
+            html = html.replace(/<p>(<h[1-6]>)/g, '$1');
+            html = html.replace(/(<\\/h[1-6]>)<\\/p>/g, '$1');
+            html = html.replace(/<p>(<pre>)/g, '$1');
+            html = html.replace(/(<\\/pre>)<\\/p>/g, '$1');
+            html = html.replace(/<p>(<ul>)/g, '$1');
+            html = html.replace(/(<\\/ul>)<\\/p>/g, '$1');
+            html = html.replace(/<p>(<blockquote>)/g, '$1');
+            html = html.replace(/(<\\/blockquote>)<\\/p>/g, '$1');
+            html = html.replace(/<p>(<hr>)<\\/p>/g, '$1');
+            
+            return html;
+        }
         
         sendBtn.onclick = send;
         input.onkeypress = e => { if (e.key === 'Enter') send(); };
