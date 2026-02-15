@@ -138,7 +138,7 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1e1e1e; color: #cccccc; height: 100vh; display: flex; flex-direction: column; }
-        .toolbar { padding: 8px; border-bottom: 1px solid #3c3c3c; display: flex; gap: 8px; }
+        .toolbar { padding: 8px; border-bottom: 1px solid #3c3c3c; display: flex; gap: 8px; position: relative; }
         .toolbar button { flex: 1; padding: 8px 12px; background: #0e639c; color: white; border: none; border-radius: 4px; cursor: pointer; }
         .toolbar button:hover { background: #1177bb; }
         .messages { flex: 1; overflow-y: auto; padding: 12px; }
@@ -169,12 +169,24 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         button#sendBtn:disabled { background: #3c3c3c; cursor: not-allowed; }
         .welcome { text-align: center; padding: 40px 20px; color: #858585; }
         .welcome h2 { color: #cccccc; margin-bottom: 8px; }
+        .history-panel { display: none; position: absolute; top: 100%; left: 0; right: 0; background: #252526; border: 1px solid #3c3c3c; border-radius: 4px; max-height: 300px; overflow-y: auto; z-index: 100; }
+        .history-panel.show { display: block; }
+        .history-item { padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #3c3c3c; display: flex; justify-content: space-between; align-items: center; }
+        .history-item:last-child { border-bottom: none; }
+        .history-item:hover { background: #2d2d2d; }
+        .history-item.active { background: #094771; }
+        .history-item .title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .history-item .meta { font-size: 0.8em; color: #858585; margin-left: 8px; }
+        .history-item .delete-btn { background: none; border: none; color: #858585; cursor: pointer; padding: 2px 6px; margin-left: 8px; }
+        .history-item .delete-btn:hover { color: #f48771; }
+        .no-history { padding: 20px; text-align: center; color: #858585; }
     </style>
 </head>
 <body>
     <div class="toolbar">
         <button id="newBtn">+ 新对话</button>
         <button id="historyBtn">历史</button>
+        <div id="historyPanel" class="history-panel"></div>
     </div>
     <div id="messages" class="messages">
         <div class="welcome">
@@ -194,6 +206,10 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         const input = document.getElementById('input');
         const sendBtn = document.getElementById('sendBtn');
         const newBtn = document.getElementById('newBtn');
+        const historyBtn = document.getElementById('historyBtn');
+        const historyPanel = document.getElementById('historyPanel');
+        let sessions = [];
+        let currentSessionId = null;
         
         function escapeHtml(text) {
             return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -208,6 +224,31 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
             messages.appendChild(div);
             messages.scrollTop = messages.scrollHeight;
             return div;
+        }
+        
+        function renderMessages(msgs) {
+            messages.innerHTML = '';
+            if (!msgs || msgs.length === 0) {
+                messages.innerHTML = '<div class="welcome"><h2>AutoTest AI 助手</h2><p>输入问题开始对话</p></div>';
+                return;
+            }
+            msgs.forEach(m => {
+                addMessage(m.role, m.role === 'user' ? escapeHtml(m.content) : m.content);
+            });
+        }
+        
+        function renderHistory() {
+            if (sessions.length === 0) {
+                historyPanel.innerHTML = '<div class="no-history">暂无历史会话</div>';
+                return;
+            }
+            historyPanel.innerHTML = sessions.map(s => 
+                '<div class="history-item' + (s.id === currentSessionId ? ' active' : '') + '" data-id="' + s.id + '">' +
+                '<span class="title">' + escapeHtml(s.title) + '</span>' +
+                '<span class="meta">' + s.messageCount + '条</span>' +
+                '<button class="delete-btn" data-id="' + s.id + '">删除</button>' +
+                '</div>'
+            ).join('');
         }
         
         function send() {
@@ -229,8 +270,30 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         };
         
         newBtn.onclick = function() {
-            messages.innerHTML = '<div class="welcome"><h2>AutoTest AI 助手</h2><p>输入问题开始对话</p></div>';
+            historyPanel.classList.remove('show');
             vscode.postMessage({ command: 'newSession' });
+        };
+        
+        historyBtn.onclick = function() {
+            historyPanel.classList.toggle('show');
+        };
+        
+        historyPanel.onclick = function(e) {
+            const item = e.target.closest('.history-item');
+            const deleteBtn = e.target.closest('.delete-btn');
+            if (deleteBtn) {
+                e.stopPropagation();
+                vscode.postMessage({ command: 'deleteSession', sessionId: deleteBtn.dataset.id });
+            } else if (item) {
+                historyPanel.classList.remove('show');
+                vscode.postMessage({ command: 'switchSession', sessionId: item.dataset.id });
+            }
+        };
+        
+        document.onclick = function(e) {
+            if (!historyBtn.contains(e.target) && !historyPanel.contains(e.target)) {
+                historyPanel.classList.remove('show');
+            }
         };
         
         window.onmessage = function(e) {
@@ -256,6 +319,13 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
             } else if (m.command === 'streamError') {
                 addMessage('error', m.error);
                 sendBtn.disabled = false;
+            } else if (m.command === 'sessions') {
+                sessions = m.data || [];
+                renderHistory();
+            } else if (m.command === 'currentSession') {
+                currentSessionId = m.data ? m.data.id : null;
+                renderMessages(m.data ? m.data.messages : []);
+                renderHistory();
             }
         };
         

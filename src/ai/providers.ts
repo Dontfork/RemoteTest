@@ -1,6 +1,5 @@
 import axios from 'axios';
 import { AIMessage, AIResponse, QWenConfig, OpenAIConfig } from '../types';
-import { logAI } from '../utils/logger';
 
 export interface AIProvider {
     send(messages: AIMessage[]): Promise<AIResponse>;
@@ -33,9 +32,6 @@ export class QWenProvider implements AIProvider {
 
             const rawContent = response.data?.output?.choices?.[0]?.message?.content;
             const content = rawContent !== undefined && rawContent !== null ? String(rawContent) : '';
-            if (content) {
-                logAI(content);
-            }
             return { content: content || 'AI 未返回有效响应' };
         } catch (error: any) {
             const errorMsg = error.response?.data?.message || error.message || '请求失败';
@@ -115,7 +111,6 @@ export class QWenProvider implements AIProvider {
 
             response.data.on('end', () => {
                 if (fullContent) {
-                    logAI(fullContent);
                     resolve({ content: fullContent });
                 } else if (!hasData) {
                     reject(new Error('流式响应无数据'));
@@ -155,9 +150,6 @@ export class OpenAIProvider implements AIProvider {
             });
 
             const content = response.data?.choices?.[0]?.message?.content || '';
-            if (content) {
-                logAI(content);
-            }
             return { content: content || 'AI 未返回有效响应' };
         } catch (error: any) {
             const errorMsg = error.response?.data?.error?.message || error.message || '请求失败';
@@ -231,7 +223,6 @@ export class OpenAIProvider implements AIProvider {
 
             response.data.on('end', () => {
                 if (fullContent) {
-                    logAI(fullContent);
                     resolve({ content: fullContent });
                 } else if (!hasData) {
                     reject(new Error('流式响应无数据'));

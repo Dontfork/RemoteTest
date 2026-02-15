@@ -5,9 +5,3 @@ let outputChannel: vscode.OutputChannel | null = null;
 export function initLogger(channel: vscode.OutputChannel): void {
     outputChannel = channel;
 }
-
-export function logAI(message: string): void {
-    if (outputChannel && message) {
-        outputChannel.appendLine(message);
-    }
-}

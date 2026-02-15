@@ -44,6 +44,17 @@ describe('AIChatView WebView Template - WebView模板测试', () => {
         assert.ok(template.includes('id="newBtn"'));
     });
 
+    it('模板应包含历史按钮', () => {
+        const template = getTemplate();
+        assert.ok(template.includes('id="historyBtn"'));
+    });
+
+    it('模板应包含历史面板', () => {
+        const template = getTemplate();
+        assert.ok(template.includes('id="historyPanel"'));
+        assert.ok(template.includes('history-panel'));
+    });
+
     it('模板应包含acquireVsCodeApi调用', () => {
         const template = getTemplate();
         assert.ok(template.includes('acquireVsCodeApi()'));
@@ -89,6 +100,41 @@ describe('AIChatView WebView Template - WebView模板测试', () => {
         const template = getTemplate();
         assert.ok(template.includes("if (m.command === 'streamComplete')"));
     });
+
+    it('应处理sessions消息', () => {
+        const template = getTemplate();
+        assert.ok(template.includes("if (m.command === 'sessions')"));
+    });
+
+    it('应处理currentSession消息', () => {
+        const template = getTemplate();
+        assert.ok(template.includes("if (m.command === 'currentSession')"));
+    });
+
+    it('应包含renderMessages函数', () => {
+        const template = getTemplate();
+        assert.ok(template.includes('function renderMessages'));
+    });
+
+    it('应包含renderHistory函数', () => {
+        const template = getTemplate();
+        assert.ok(template.includes('function renderHistory'));
+    });
+
+    it('历史按钮应有点击事件', () => {
+        const template = getTemplate();
+        assert.ok(template.includes('historyBtn.onclick'));
+    });
+
+    it('应支持切换会话', () => {
+        const template = getTemplate();
+        assert.ok(template.includes('switchSession'));
+    });
+
+    it('应支持删除会话', () => {
+        const template = getTemplate();
+        assert.ok(template.includes('deleteSession'));
+    });
 });
 
 describe('AIChatView Markdown Rendering - Markdown渲染测试', () => {
@@ -117,5 +163,37 @@ describe('AIChatView Markdown Rendering - Markdown渲染测试', () => {
     it('回调函数应为async以支持动态渲染', () => {
         const source = getSourceFile();
         assert.ok(source.includes('async (chunk)'));
+    });
+});
+
+describe('AIChatView Session Management - 会话管理测试', () => {
+    it('应处理newSession命令', () => {
+        const source = getSourceFile();
+        assert.ok(source.includes("case 'newSession'"));
+    });
+
+    it('应处理switchSession命令', () => {
+        const source = getSourceFile();
+        assert.ok(source.includes("case 'switchSession'"));
+    });
+
+    it('应处理deleteSession命令', () => {
+        const source = getSourceFile();
+        assert.ok(source.includes("case 'deleteSession'"));
+    });
+
+    it('应处理getSessions命令', () => {
+        const source = getSourceFile();
+        assert.ok(source.includes("case 'getSessions'"));
+    });
+
+    it('应有sendSessions方法', () => {
+        const source = getSourceFile();
+        assert.ok(source.includes('private sendSessions'));
+    });
+
+    it('应有sendCurrentSession方法', () => {
+        const source = getSourceFile();
+        assert.ok(source.includes('private sendCurrentSession'));
     });
 });
