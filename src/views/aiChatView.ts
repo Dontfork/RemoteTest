@@ -203,234 +203,232 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
     </div>
     <script>
         const vscode = acquireVsCodeApi();
-        const messages = document.getElementById('messages');
-        const input = document.getElementById('input');
-        const sendBtn = document.getElementById('sendBtn');
-        const newBtn = document.getElementById('newBtn');
-        const toggleSessions = document.getElementById('toggleSessions');
-        const sessionList = document.getElementById('sessionList');
         
-        let streamingMsg = null;
-        let streamContent = '';
-        let currentSessionId = null;
-        let sessions = [];
-        
-        vscode.postMessage({ command: 'getSessions' });
-        
-        function send() {
-            try {
-                const text = input.value.trim();
-                if (!text) return;
-                addMsg('user', text);
-                input.value = '';
-                sendBtn.disabled = true;
-                showStreamingMsg();
-                vscode.postMessage({ command: 'sendMessage', data: text });
-            } catch (err) {
-                addMsg('error', '发送错误: ' + (err.message || err));
-                sendBtn.disabled = false;
+        document.addEventListener('DOMContentLoaded', function() {
+            const messages = document.getElementById('messages');
+            const input = document.getElementById('input');
+            const sendBtn = document.getElementById('sendBtn');
+            const newBtn = document.getElementById('newBtn');
+            const toggleSessions = document.getElementById('toggleSessions');
+            const sessionList = document.getElementById('sessionList');
+            
+            let streamingMsg = null;
+            let streamContent = '';
+            let currentSessionId = null;
+            let sessions = [];
+            
+            function esc(t) { 
+                return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); 
             }
-        }
-        
-        function addMsg(role, content) {
-            const w = messages.querySelector('.welcome');
-            if (w) w.remove();
-            const d = document.createElement('div');
-            d.className = 'msg ' + role;
-            if (role === 'assistant') {
-                d.innerHTML = '<div class="bubble md-content">' + renderMarkdown(content) + '</div>';
-            } else if (role === 'error') {
-                d.innerHTML = '<div class="bubble">' + esc(content) + '</div>';
-            } else {
-                d.innerHTML = '<div class="bubble">' + esc(content) + '</div>';
-            }
-            messages.appendChild(d);
-            messages.scrollTop = messages.scrollHeight;
-            return d;
-        }
-        
-        function showStreamingMsg() {
-            streamContent = '';
-            const d = document.createElement('div');
-            d.className = 'msg assistant streaming';
-            d.innerHTML = '<div class="bubble md-content"><span class="cursor">▌</span></div>';
-            messages.appendChild(d);
-            messages.scrollTop = messages.scrollHeight;
-            streamingMsg = d;
-        }
-        
-        function updateStreamingMsg(chunk) {
-            streamContent += chunk;
-            if (streamingMsg) {
-                const bubble = streamingMsg.querySelector('.bubble');
-                if (bubble) {
-                    bubble.innerHTML = renderMarkdown(streamContent) + '<span class="cursor">▌</span>';
-                    messages.scrollTop = messages.scrollHeight;
+            
+            function renderMarkdown(text) {
+                if (!text) {
+                    return '<p></p>';
                 }
-            }
-        }
-        
-        function completeStreamingMsg(content) {
-            if (streamingMsg) {
-                streamingMsg.classList.remove('streaming');
-                const bubble = streamingMsg.querySelector('.bubble');
-                if (bubble) {
-                    bubble.innerHTML = renderMarkdown(content || streamContent);
-                }
-            }
-            streamingMsg = null;
-            streamContent = '';
-        }
-        
-        function showError(error) {
-            if (streamingMsg) {
-                streamingMsg.remove();
-                streamingMsg = null;
-            }
-            addMsg('error', error);
-        }
-        
-        function esc(t) { 
-            return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); 
-        }
-        
-        function renderMarkdown(text) {
-            if (!text) {
-                return '<p></p>';
-            }
-            let html = esc(text);
-            
-            var backtick = String.fromCharCode(96);
-            var codeBlockRegex = new RegExp(backtick + backtick + backtick + '(\\w*)\\n([\\s\\S]*?)' + backtick + backtick + backtick, 'g');
-            html = html.replace(codeBlockRegex, function(match, lang, code) {
-                return '<pre><code class="language-' + lang + '">' + code.trim() + '</code></pre>';
-            });
-            
-            var inlineCodeRegex = new RegExp(backtick + '([^' + backtick + ']*)' + backtick, 'g');
-            html = html.replace(inlineCodeRegex, '<code>$1</code>');
-            
-            html = html.replace(/\*\*([^\*]+)\*\*/g, '<strong>$1</strong>');
-            
-            html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
-            html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
-            html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
-            
-            html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
-            
-            html = html.replace(/^[-] (.+)$/gm, '<li>$1</li>');
-            html = html.replace(/^[*] (.+)$/gm, '<li>$1</li>');
-            html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
-            
-            html = html.replace(/\*([^\*\n]+?)\*/g, function(match, content) {
-                if (content.startsWith(' ') || content.endsWith(' ')) {
-                    return match;
-                }
-                return '<em>' + content + '</em>';
-            });
-            
-            html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
-            
-            html = html.replace(/^---$/gm, '<hr>');
-            
-            html = html.replace(/\n\n/g, '</p><p>');
-            html = '<p>' + html + '</p>';
-            html = html.replace(/<p><\/p>/g, '');
-            html = html.replace(/<p>(<h[1-6]>)/g, '$1');
-            html = html.replace(/(<\/h[1-6]>)<\/p>/g, '$1');
-            html = html.replace(/<p>(<pre>)/g, '$1');
-            html = html.replace(/(<\/pre>)<\/p>/g, '$1');
-            html = html.replace(/<p>(<ul>)/g, '$1');
-            html = html.replace(/(<\/ul>)<\/p>/g, '$1');
-            html = html.replace(/<p>(<blockquote>)/g, '$1');
-            html = html.replace(/(<\/blockquote>)<\/p>/g, '$1');
-            html = html.replace(/<p>(<hr>)<\/p>/g, '$1');
-            
-            return html;
-        }
-        
-        function renderSessionList() {
-            sessionList.innerHTML = '';
-            sessions.forEach(s => {
-                const item = document.createElement('div');
-                item.className = 'session-item' + (s.id === currentSessionId ? ' active' : '');
+                let html = esc(text);
                 
-                const date = new Date(s.updatedAt);
-                const timeStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString().slice(0,5);
-                
-                item.innerHTML = 
-                    '<div class="session-info">' +
-                        '<div class="session-title">' + esc(s.title) + '</div>' +
-                        '<div class="session-meta">' + s.messageCount + ' 条消息 · ' + timeStr + '</div>' +
-                    '</div>' +
-                    '<button class="session-delete" data-id="' + s.id + '" title="删除">×</button>';
-                
-                item.querySelector('.session-info').onclick = () => {
-                    currentSessionId = s.id;
-                    vscode.postMessage({ command: 'switchSession', sessionId: s.id });
-                    sessionList.classList.add('hidden');
-                };
-                
-                item.querySelector('.session-delete').onclick = (e) => {
-                    e.stopPropagation();
-                    vscode.postMessage({ command: 'deleteSession', sessionId: s.id });
-                };
-                
-                sessionList.appendChild(item);
-            });
-        }
-        
-        function loadSession(session) {
-            messages.innerHTML = '';
-            if (session && session.messages && session.messages.length > 0) {
-                session.messages.forEach(m => {
-                    addMsg(m.role, m.content);
+                var backtick = String.fromCharCode(96);
+                var codeBlockRegex = new RegExp(backtick + backtick + backtick + '(\\w*)\\n([\\s\\S]*?)' + backtick + backtick + backtick, 'g');
+                html = html.replace(codeBlockRegex, function(match, lang, code) {
+                    return '<pre><code class="language-' + lang + '">' + code.trim() + '</code></pre>';
                 });
-            } else {
-                messages.innerHTML = '<div class="welcome"><h2>AutoTest AI 助手</h2><p>输入问题开始对话</p></div>';
+                
+                var inlineCodeRegex = new RegExp(backtick + '([^' + backtick + ']*)' + backtick, 'g');
+                html = html.replace(inlineCodeRegex, '<code>$1</code>');
+                
+                html = html.replace(/\*\*([^\*]+)\*\*/g, '<strong>$1</strong>');
+                
+                html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+                html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+                html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+                
+                html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+                
+                html = html.replace(/^[-] (.+)$/gm, '<li>$1</li>');
+                html = html.replace(/^[*] (.+)$/gm, '<li>$1</li>');
+                html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
+                
+                html = html.replace(/\*([^\*\n]+?)\*/g, function(match, content) {
+                    if (content.startsWith(' ') || content.endsWith(' ')) {
+                        return match;
+                    }
+                    return '<em>' + content + '</em>';
+                });
+                
+                html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+                
+                html = html.replace(/^---$/gm, '<hr>');
+                
+                html = html.replace(/\n\n/g, '</p><p>');
+                html = '<p>' + html + '</p>';
+                html = html.replace(/<p><\/p>/g, '');
+                html = html.replace(/<p>(<h[1-6]>)/g, '$1');
+                html = html.replace(/(<\/h[1-6]>)<\/p>/g, '$1');
+                html = html.replace(/<p>(<pre>)/g, '$1');
+                html = html.replace(/(<\/pre>)<\/p>/g, '$1');
+                html = html.replace(/<p>(<ul>)/g, '$1');
+                html = html.replace(/(<\/ul>)<\/p>/g, '$1');
+                html = html.replace(/<p>(<blockquote>)/g, '$1');
+                html = html.replace(/(<\/blockquote>)<\/p>/g, '$1');
+                html = html.replace(/<p>(<hr>)<\/p>/g, '$1');
+                
+                return html;
             }
-        }
-        
-        sendBtn.onclick = send;
-        input.onkeydown = e => { 
-            if (e.key === 'Enter' && !e.shiftKey) { 
-                e.preventDefault(); 
-                send(); 
-            } 
-        };
-        
-        newBtn.onclick = () => {
-            vscode.postMessage({ command: 'newSession' });
-            sessionList.classList.add('hidden');
-        };
-        
-        toggleSessions.onclick = () => {
-            sessionList.classList.toggle('hidden');
-        };
-        
-        window.onerror = function(msg, url, line, col, error) {
-            addMsg('error', 'JS错误: ' + msg + ' at line ' + line);
-            return false;
-        };
-        
-        window.onmessage = e => {
-            const m = e.data;
-            if (m.command === 'streamChunk') {
-                updateStreamingMsg(m.data);
-            } else if (m.command === 'streamComplete') {
-                completeStreamingMsg(m.data);
-                sendBtn.disabled = false;
-            } else if (m.command === 'streamError') {
-                showError(m.error);
-                sendBtn.disabled = false;
-            } else if (m.command === 'sessions') {
-                sessions = m.data;
-                renderSessionList();
-            } else if (m.command === 'currentSession') {
-                currentSessionId = m.data ? m.data.id : null;
-                loadSession(m.data);
-                renderSessionList();
+            
+            function addMsg(role, content) {
+                const w = messages.querySelector('.welcome');
+                if (w) w.remove();
+                const d = document.createElement('div');
+                d.className = 'msg ' + role;
+                if (role === 'assistant') {
+                    d.innerHTML = '<div class="bubble md-content">' + renderMarkdown(content) + '</div>';
+                } else if (role === 'error') {
+                    d.innerHTML = '<div class="bubble">' + esc(content) + '</div>';
+                } else {
+                    d.innerHTML = '<div class="bubble">' + esc(content) + '</div>';
+                }
+                messages.appendChild(d);
+                messages.scrollTop = messages.scrollHeight;
+                return d;
             }
-        };
+            
+            function showStreamingMsg() {
+                streamContent = '';
+                const d = document.createElement('div');
+                d.className = 'msg assistant streaming';
+                d.innerHTML = '<div class="bubble md-content"><span class="cursor">▌</span></div>';
+                messages.appendChild(d);
+                messages.scrollTop = messages.scrollHeight;
+                streamingMsg = d;
+            }
+            
+            function updateStreamingMsg(chunk) {
+                streamContent += chunk;
+                if (streamingMsg) {
+                    const bubble = streamingMsg.querySelector('.bubble');
+                    if (bubble) {
+                        bubble.innerHTML = renderMarkdown(streamContent) + '<span class="cursor">▌</span>';
+                        messages.scrollTop = messages.scrollHeight;
+                    }
+                }
+            }
+            
+            function completeStreamingMsg(content) {
+                if (streamingMsg) {
+                    streamingMsg.classList.remove('streaming');
+                    const bubble = streamingMsg.querySelector('.bubble');
+                    if (bubble) {
+                        bubble.innerHTML = renderMarkdown(content || streamContent);
+                    }
+                }
+                streamingMsg = null;
+                streamContent = '';
+            }
+            
+            function showError(error) {
+                if (streamingMsg) {
+                    streamingMsg.remove();
+                    streamingMsg = null;
+                }
+                addMsg('error', error);
+            }
+            
+            function renderSessionList() {
+                sessionList.innerHTML = '';
+                sessions.forEach(s => {
+                    const item = document.createElement('div');
+                    item.className = 'session-item' + (s.id === currentSessionId ? ' active' : '');
+                    
+                    const date = new Date(s.updatedAt);
+                    const timeStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString().slice(0,5);
+                    
+                    item.innerHTML = 
+                        '<div class="session-info">' +
+                            '<div class="session-title">' + esc(s.title) + '</div>' +
+                            '<div class="session-meta">' + s.messageCount + ' 条消息 · ' + timeStr + '</div>' +
+                        '</div>' +
+                        '<button class="session-delete" data-id="' + s.id + '" title="删除">×</button>';
+                    
+                    item.querySelector('.session-info').onclick = () => {
+                        currentSessionId = s.id;
+                        vscode.postMessage({ command: 'switchSession', sessionId: s.id });
+                        sessionList.classList.add('hidden');
+                    };
+                    
+                    item.querySelector('.session-delete').onclick = (e) => {
+                        e.stopPropagation();
+                        vscode.postMessage({ command: 'deleteSession', sessionId: s.id });
+                    };
+                    
+                    sessionList.appendChild(item);
+                });
+            }
+            
+            function loadSession(session) {
+                messages.innerHTML = '';
+                if (session && session.messages && session.messages.length > 0) {
+                    session.messages.forEach(m => {
+                        addMsg(m.role, m.content);
+                    });
+                } else {
+                    messages.innerHTML = '<div class="welcome"><h2>AutoTest AI 助手</h2><p>输入问题开始对话</p></div>';
+                }
+            }
+            
+            function send() {
+                try {
+                    const text = input.value.trim();
+                    if (!text) return;
+                    addMsg('user', text);
+                    input.value = '';
+                    sendBtn.disabled = true;
+                    showStreamingMsg();
+                    vscode.postMessage({ command: 'sendMessage', data: text });
+                } catch (err) {
+                    showError('发送错误: ' + (err.message || err));
+                    sendBtn.disabled = false;
+                }
+            }
+            
+            sendBtn.onclick = send;
+            input.onkeydown = e => { 
+                if (e.key === 'Enter' && !e.shiftKey) { 
+                    e.preventDefault(); 
+                    send(); 
+                } 
+            };
+            
+            newBtn.onclick = () => {
+                vscode.postMessage({ command: 'newSession' });
+                sessionList.classList.add('hidden');
+            };
+            
+            toggleSessions.onclick = () => {
+                sessionList.classList.toggle('hidden');
+            };
+            
+            window.onmessage = e => {
+                const m = e.data;
+                if (m.command === 'streamChunk') {
+                    updateStreamingMsg(m.data);
+                } else if (m.command === 'streamComplete') {
+                    completeStreamingMsg(m.data);
+                    sendBtn.disabled = false;
+                } else if (m.command === 'streamError') {
+                    showError(m.error);
+                    sendBtn.disabled = false;
+                } else if (m.command === 'sessions') {
+                    sessions = m.data;
+                    renderSessionList();
+                } else if (m.command === 'currentSession') {
+                    currentSessionId = m.data ? m.data.id : null;
+                    loadSession(m.data);
+                    renderSessionList();
+                }
+            };
+            
+            vscode.postMessage({ command: 'getSessions' });
+        });
     </script>
 </body>
 </html>`;
