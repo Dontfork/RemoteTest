@@ -165,14 +165,14 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         .bubble a { color: #3794ff; }
         .bubble strong { color: #ffffff; }
         .bubble em { color: #d0d0d0; }
-        .input-area { padding: 10px 12px; border-top: 1px solid #3c3c3c; background: transparent; }
+        .input-area { padding: 6px 12px; border-top: 1px solid #3c3c3c; background: transparent; }
         .input-wrap { display: flex; gap: 6px; align-items: center; }
-        textarea { flex: 1; padding: 4px 0; background: transparent; color: #cccccc; border: none; resize: none; font-family: inherit; font-size: 14px; line-height: 1.4; height: 20px; }
+        textarea { flex: 1; padding: 2px 0; background: transparent; color: #cccccc; border: none; resize: none; font-family: inherit; font-size: 14px; line-height: 1.3; height: 18px; }
         textarea:focus { outline: none; }
-        button#sendBtn { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: transparent; color: #858585; border: none; cursor: pointer; transition: all 0.2s; flex-shrink: 0; }
+        button#sendBtn { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: transparent; color: #858585; border: none; cursor: pointer; transition: all 0.2s; flex-shrink: 0; }
         button#sendBtn:hover { color: #cccccc; }
         button#sendBtn:disabled { color: #3c3c3c; cursor: not-allowed; }
-        button#sendBtn svg { width: 16px; height: 16px; stroke: currentColor; stroke-width: 1.5; fill: none; }
+        button#sendBtn svg { width: 14px; height: 14px; stroke: currentColor; stroke-width: 1.5; fill: none; }
         .welcome { text-align: center; padding: 60px 20px; color: #858585; }
         .welcome-icon { width: 48px; height: 48px; margin: 0 auto 16px; stroke: #858585; stroke-width: 1; fill: none; }
         .welcome h2 { color: #cccccc; margin-bottom: 8px; font-weight: 400; }
