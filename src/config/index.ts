@@ -36,7 +36,7 @@ const defaultConfig: AutoTestConfig = {
             { name: "应用日志", path: "/var/logs" },
             { name: "测试日志", path: "/var/log/autotest" }
         ],
-        downloadPath: "./downloads",
+        downloadPath: "",
         refreshInterval: 5000
     }
 };

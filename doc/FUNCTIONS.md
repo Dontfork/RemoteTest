@@ -91,7 +91,7 @@ AI 对话功能允许用户与 AI 助手进行自然语言交互，支持多种 
 
 > **⚠️ 路径配置说明**：所有目录路径必须使用绝对路径
 > - `directories[].path`: 远程服务器绝对路径，如 `/var/log/myapp`
-> - `downloadPath`: 支持相对路径（相对于工作区）或绝对路径
+> - `downloadPath`: 本地绝对路径，如 `D:\downloads`
 
 ```json
 {
