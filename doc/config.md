@@ -272,7 +272,7 @@ interface LogsConfig {
 | directories | LogDirectoryConfig[] | 是 | [] | 要监控的日志目录列表 |
 | directories[].name | string | 是 | - | 目录在界面显示的名称 |
 | directories[].path | string | 是 | - | 远程服务器上的目录路径 |
-| downloadPath | string | 是 | "./downloads" | 日志下载保存路径 |
+| downloadPath | string | 是 | "" | 日志下载保存路径（本地绝对路径） |
 | refreshInterval | number | 是 | 5000 | 自动刷新间隔，单位毫秒。设为 0 或负数禁用自动刷新 |
 
 **日志监控功能**：
@@ -405,7 +405,7 @@ const defaultConfig: AutoTestConfig = {
             { name: "应用日志", path: "/var/logs" },
             { name: "测试日志", path: "/var/log/autotest" }
         ],
-        downloadPath: "./downloads",
+        downloadPath: "D:\\downloads",
         refreshInterval: 5000
     }
 };
@@ -483,7 +483,7 @@ function onConfigChanged() {
             { "name": "测试日志", "path": "/var/log/autotest" },
             { "name": "系统日志", "path": "/var/log/system" }
         ],
-        "downloadPath": "./logs",
+        "downloadPath": "D:\\logs",
         "refreshInterval": 3000
     }
 }

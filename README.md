@@ -87,7 +87,7 @@ vsce package
       { "name": "应用日志", "path": "/var/log/myapp" },
       { "name": "测试日志", "path": "/var/log/autotest" }
     ],
-    "downloadPath": "./downloads",
+    "downloadPath": "D:\\downloads",
     "refreshInterval": 5000
   }
 }

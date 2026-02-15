@@ -100,7 +100,7 @@ AI 对话功能允许用户与 AI 助手进行自然语言交互，支持多种 
       { "name": "应用日志", "path": "/var/log/myapp" },
       { "name": "测试日志", "path": "/var/log/autotest" }
     ],
-    "downloadPath": "./downloads",
+    "downloadPath": "D:\\downloads",
     "refreshInterval": 5000
   },
   "server": {
@@ -326,7 +326,7 @@ AutoTest 提供两种文件操作方式：
       { "name": "应用日志", "path": "/var/log/myapp" },
       { "name": "测试日志", "path": "/var/log/autotest" }
     ],
-    "downloadPath": "./downloads",
+    "downloadPath": "D:\\downloads",
     "refreshInterval": 5000
   }
 }

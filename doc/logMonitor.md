@@ -101,7 +101,7 @@ TreeView 显示目录列表
             { "name": "测试日志", "path": "/var/log/autotest" },
             { "name": "系统日志", "path": "/var/log/system" }
         ],
-        "downloadPath": "./downloads",
+        "downloadPath": "D:\\downloads",
         "refreshInterval": 5000
     }
 }
