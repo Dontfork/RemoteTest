@@ -385,7 +385,12 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         }
         
         sendBtn.onclick = send;
-        input.onkeypress = e => { if (e.key === 'Enter') send(); };
+        input.onkeydown = e => { 
+            if (e.key === 'Enter' && !e.shiftKey) { 
+                e.preventDefault(); 
+                send(); 
+            } 
+        };
         
         newBtn.onclick = () => {
             vscode.postMessage({ command: 'newSession' });
