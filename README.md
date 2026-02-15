@@ -7,7 +7,11 @@
 - **文件上传**: 支持单文件和目录上传，右键菜单操作
 - **运行用例**: 上传文件并自动执行配置的测试命令
 - **日志监控**: 实时监控服务器日志，支持多目录、下载到本地
-- **AI 对话**: 支持多种 AI 提供商（QWen、OpenAI），可配置模型名称
+- **AI 对话**: 
+  - 支持多种 AI 提供商（QWen、OpenAI）
+  - 流式输出 AI 响应
+  - Markdown 语法渲染
+  - 会话历史管理和持久化存储
 
 ## 快速开始
 
@@ -20,7 +24,7 @@ npm install
 ### 编译
 
 ```bash
-npm run compile
+npm run webpack-dev
 ```
 
 ### 运行测试
@@ -66,7 +70,7 @@ vsce package
   },
   "command": {
     "executeCommand": "pytest {filePath} -v",
-    "filterPatterns": ["error", "failed", "FAILED", "Error", "ERROR"],
+    "filterPatterns": ["ERROR", "FAILED", "Exception"],
     "filterMode": "include"
   },
   "ai": {
@@ -145,13 +149,41 @@ d:\code\AutoTest
 │   └── icon.svg            # 插件图标
 ├── src/                    # 源代码
 │   ├── ai/                 # AI 模块
+│   │   ├── chat.ts         # AI 对话管理
+│   │   ├── providers.ts    # AI 提供商实现
+│   │   ├── sessionManager.ts # 会话管理
+│   │   └── index.ts
 │   ├── config/             # 配置模块
+│   │   └── index.ts
 │   ├── core/               # 核心功能模块
+│   │   ├── commandExecutor.ts
+│   │   ├── uploader.ts
+│   │   ├── logMonitor.ts
+│   │   ├── sshClient.ts
+│   │   ├── scpClient.ts
+│   │   └── index.ts
 │   ├── types/              # 类型定义
+│   │   └── index.ts
+│   ├── utils/              # 工具模块
+│   │   ├── logger.ts       # 日志工具
+│   │   └── markdown.ts     # Markdown 渲染
 │   ├── views/              # UI 视图
+│   │   ├── aiChatView.ts   # AI 对话界面
+│   │   ├── logTreeView.ts  # 日志监控界面
+│   │   └── index.ts
 │   └── extension.ts        # 扩展入口
 ├── test/                   # 测试用例
-│   ├── suite/              # 测试套件
+│   ├── suite/
+│   │   ├── ai.test.ts
+│   │   ├── aiStreaming.test.ts
+│   │   ├── commandExecutor.test.ts
+│   │   ├── config.test.ts
+│   │   ├── logMonitor.test.ts
+│   │   ├── markdown.test.ts
+│   │   ├── scpClient.test.ts
+│   │   ├── sessionManager.test.ts
+│   │   ├── sshClient.test.ts
+│   │   └── types.test.ts
 │   ├── package.json
 │   ├── runTest.ts
 │   └── tsconfig.json

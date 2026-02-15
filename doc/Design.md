@@ -24,24 +24,36 @@ AutoTest 是一款 VSCode 插件，旨在简化测试工作流程，提供文件
 │                      Core Modules                             │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
 │  │   AIChat    │  │ LogMonitor  │  │  Uploader   │          │
+│  │SessionMgr   │  │             │  │             │          │
 │  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘          │
 │         │                │                │                  │
 │  ┌──────▼──────┐  ┌──────▼──────┐  ┌──────▼──────┐          │
 │  │CommandExec  │  │   Config    │  │ SSH/SCP     │          │
 │  │  (SSH)      │  │             │  │  Client     │          │
 │  └─────────────┘  └─────────────┘  └─────────────┘          │
+│                                                               │
+│  ┌─────────────────────────────────────────────────────────┐ │
+│  │                    Utils                                 │ │
+│  │  ┌───────────┐  ┌───────────────┐                      │ │
+│  │  │  Logger   │  │  Markdown     │                      │ │
+│  │  └───────────┘  └───────────────┘                      │ │
+│  └─────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ## 3. 模块概览
 
-| 模块 | 文档 | 职责 |
+| 模块 | 文件 | 职责 |
 |------|------|------|
-| 配置模块 | [config.md](./config.md) | 管理插件配置，支持自动创建默认配置文件 |
-| 命令执行模块 | [commandExecutor.md](./commandExecutor.md) | 通过 SSH 执行远程命令并过滤输出 |
-| 日志监控模块 | [logMonitor.md](./logMonitor.md) | 通过 SCP 监控和下载远程日志文件 |
-| AI 对话模块 | [ai.md](./ai.md) | 提供与 AI 模型的对话能力 |
-| AI 多模式架构 | [ai-mode-design.md](./ai-mode-design.md) | AI 模块多模式架构设计（Chat/Agent/Plan） |
+| 配置模块 | `src/config/index.ts` | 管理插件配置，支持自动创建默认配置文件 |
+| 命令执行模块 | `src/core/commandExecutor.ts` | 通过 SSH 执行远程命令并过滤输出 |
+| 日志监控模块 | `src/core/logMonitor.ts` | 通过 SCP 监控和下载远程日志文件 |
+| 文件上传模块 | `src/core/uploader.ts` | 文件上传和用例运行功能 |
+| AI 对话模块 | `src/ai/chat.ts` | 提供与 AI 模型的对话能力 |
+| AI 提供商模块 | `src/ai/providers.ts` | AI 服务提供商实现（QWen、OpenAI） |
+| 会话管理模块 | `src/ai/sessionManager.ts` | AI 对话会话的持久化管理 |
+| 日志工具模块 | `src/utils/logger.ts` | 统一日志输出到 VSCode OutputChannel |
+| Markdown 模块 | `src/utils/markdown.ts` | Markdown 文本渲染 |
 
 ## 4. 配置结构
 
@@ -75,7 +87,7 @@ interface AutoTestConfig {
     },
     "command": {
         "executeCommand": "pytest {filePath} -v",
-        "filterPatterns": ["error", "failed", "FAILED", "Error", "ERROR"],
+        "filterPatterns": ["ERROR", "FAILED", "Exception"],
         "filterMode": "include"
     },
     "ai": {
@@ -146,17 +158,6 @@ interface AutoTestConfig {
 | `{localFileName}` | 本地文件名 | `test_example.py` |
 | `{remoteDir}` | 远程工程目录 | `/tmp/autotest` |
 
-**命令配置示例**:
-```json
-{
-    "command": {
-        "executeCommand": "pytest {filePath} -v",
-        "filterPatterns": ["error", "failed", "FAILED", "Error", "ERROR"],
-        "filterMode": "include"
-    }
-}
-```
-
 ## 5. UI 设计
 
 ### 5.1 活动栏 - AI 对话
@@ -164,14 +165,16 @@ interface AutoTestConfig {
 **位置**: VSCode 左侧活动栏
 
 **组件**:
-- 消息列表区域
+- 会话管理工具栏（新建对话、历史记录）
+- 消息列表区域（支持 Markdown 渲染）
 - 输入框
-- 发送按钮 (箭头图标)
+- 发送按钮
 
-**样式特点**:
-- 简约风格
-- 使用 VSCode 原生主题色
-- 消息气泡式布局
+**功能特点**:
+- 流式输出 AI 响应
+- Markdown 语法渲染
+- 会话历史管理
+- 会话持久化存储
 
 ### 5.2 资源管理器 - 日志监控
 
@@ -181,12 +184,13 @@ interface AutoTestConfig {
 - 配置目录列表（可折叠）
 - 子目录树形结构
 - 文件列表（显示大小和修改时间）
-- 刷新按钮、刷新配置按钮、打开配置按钮
+- 工具栏按钮（刷新、刷新配置、打开配置）
 
 **功能**:
 - 支持多目录监控
 - 目录可展开浏览
 - 点击文件下载日志
+- 自动/手动刷新
 
 ## 6. 命令列表
 
@@ -202,90 +206,76 @@ interface AutoTestConfig {
 
 ### 6.1 右键菜单配置
 
-右键菜单在资源管理器中显示，支持文件和目录操作：
-
 | 菜单项 | 文件 | 目录 | 说明 |
 |--------|------|------|------|
 | 运行用例 | ✓ | ✓ | 上传文件/目录并执行配置的测试命令 |
 | 上传文件 | ✓ | ✓ | 仅上传文件/目录，不执行命令 |
 
 **目录操作行为**：
-- 选择目录时，会遍历目录下所有文件（排除 `.` 开头的隐藏目录和 `node_modules`）
+- 遍历目录下所有文件（排除 `.` 开头的隐藏目录和 `node_modules`）
 - "运行用例"会对每个文件执行上传和命令执行
 - "上传文件"会上传目录下所有文件到远程服务器对应位置
 
-**配置动态刷新**：
-- 插件会自动监听配置文件变化，修改配置文件后会自动刷新
-- 也可以通过 `autotest.reloadConfig` 命令手动刷新配置
-- 日志监控视图工具栏提供刷新配置和打开配置文件的快捷按钮
-
 ## 7. 数据流
 
-### 7.1 文件上传流程
-
-#### 7.1.1 运行用例（上传并执行）
+### 7.1 AI 对话流程
 
 ```
-用户右键点击文件/目录 → 选择"运行用例"
+用户输入消息
     │
     ▼
-判断选择类型
+Webview.postMessage()
     │
-    ├── 文件: 单文件处理
+    ▼
+AIChatViewProvider 接收
+    │
+    ▼
+AIChat.sendMessageStream()
+    │
+    ├── 添加用户消息到会话
+    │
+    ├── 调用 Provider.sendStream()
+    │       │
+    │       ├── QWen/OpenAI API 流式请求
+    │       │
+    │       └── 通过 onChunk 回调返回数据块
+    │
+    ├── Webview 接收 streamChunk 消息
+    │       │
+    │       └── 实时更新 UI（Markdown 渲染）
+    │
+    └── 保存 AI 响应到会话
+            │
+            ▼
+        SessionManager 持久化存储
+```
+
+### 7.2 文件上传流程
+
+```
+用户右键点击文件/目录
+    │
+    ├── 选择"运行用例"
     │       │
     │       ▼
-    │   Uploader.runTestCase(filePath)
+    │   Uploader.runTestCase()
     │       │
     │       ├── 计算远程路径
-    │       │
     │       ├── SCP 上传文件
-    │       │
     │       ├── 构建命令变量
-    │       │
     │       ├── SSH 执行命令
-    │       │
     │       └── 过滤输出显示
     │
-    └── 目录: 批量处理
+    └── 选择"上传文件"
             │
             ▼
-        Uploader.runTestCase(dirPath)
+        Uploader.uploadFile()
             │
-            ├── 遍历目录获取所有文件
-            │       （排除 .开头 和 node_modules）
-            │
-            └── 对每个文件执行上述流程
+            ├── 计算远程路径
+            └── SCP 上传文件
 ```
 
-#### 7.1.2 上传文件（仅上传）
-
-```
-用户右键点击文件/目录 → 选择"上传文件"
-    │
-    ▼
-判断选择类型
-    │
-    ├── 文件: 单文件上传
-    │       │
-    │       ▼
-    │   Uploader.uploadFile(filePath)
-    │       │
-    │       ├── 计算远程路径
-    │       │
-    │       └── SCP 上传文件
-    │
-    └── 目录: 批量上传
-            │
-            ▼
-        Uploader.uploadDirectory(dirPath)
-            │
-            ├── 遍历目录获取所有文件
-            │       （排除 .开头 和 node_modules）
-            │
-            └── SCP 上传每个文件
-```
-
-### 7.2 日志监控流程
+### 7.3 日志监控流程
 
 ```
 读取配置中的日志目录列表
@@ -305,75 +295,55 @@ TreeView 显示目录列表
             │
             ▼
         SCP 下载文件到本地
-            │
-            ▼
-        显示下载完成提示
 ```
 
-### 7.3 AI 对话流程
+## 8. 输出通道
 
-```
-用户输入消息
-    │
-    ▼
-Webview.postMessage()
-    │
-    ▼
-AIChatViewProvider 接收
-    │
-    ▼
-AIChat.sendMessage()
-    │
-    ├── 添加到历史
-    │
-    ├── 获取配置的模型名称
-    │
-    ├── 调用 AI API (携带 model 参数)
-    │
-    ▼
-返回响应到 Webview
-```
+插件使用两个独立的输出通道：
 
-## 8. 扩展性设计
+| 通道名称 | 用途 |
+|----------|------|
+| AutoTest | 插件自身日志、调试信息 |
+| TestOutput | 用例执行时的命令输出 |
 
-### 8.1 AI 提供商扩展
+## 9. 扩展性设计
+
+### 9.1 AI 提供商扩展
 
 新增 AI 提供商需要:
-1. 在 `types/index.ts` 中添加配置接口 (包含 apiKey, apiUrl, model 字段)
+1. 在 `types/index.ts` 中添加配置接口
 2. 在 `ai/providers.ts` 中实现新的 Provider 类
 3. 在 `AIConfig` 中添加配置项
 4. 在 `sendMessage()` 中添加路由逻辑
 
-详见 [AI 对话模块文档](./ai.md#10-扩展性设计)
+### 9.2 Markdown 渲染
 
-### 8.2 AI 多模式架构
+`src/utils/markdown.ts` 提供独立的 Markdown 渲染功能：
+- 支持标题、加粗、斜体
+- 支持代码块和行内代码
+- 支持链接、列表、引用
+- 支持分割线
+- 自动转义 HTML 特殊字符
 
-AI 模块支持多种交互模式，采用可扩展的架构设计：
-- **Chat 模式**：基础对话模式，提供问答能力
-- **Agent 模式**：自主执行模式，可调用工具完成任务
-- **Plan 模式**：规划模式，分解复杂任务并逐步执行
-
-详见 [AI 多模式架构设计](./ai-mode-design.md)
-
-## 9. 错误处理
+## 10. 错误处理
 
 | 错误场景 | 处理方式 |
 |----------|----------|
 | 配置加载失败 | 使用默认配置 |
 | SSH 连接失败 | 显示错误消息 |
 | SCP 传输失败 | 显示错误消息并记录日志 |
-| 文件操作失败 | 抛出异常并提示用户 |
-| 模型名称为空 | 使用默认模型 |
+| AI API 调用失败 | 流式请求失败时回退到非流式请求 |
+| 会话存储失败 | 记录错误日志 |
 
-## 10. 性能考虑
+## 11. 性能考虑
 
 - 日志监控支持禁用自动刷新（refreshInterval = 0）
 - SSH 连接复用，减少连接开销
 - API 请求设置 60 秒超时
-- SCP 传输支持大文件
 - webpack 打包优化，减少插件体积
+- AI 响应流式输出，提升用户体验
 
-## 11. 目录结构
+## 12. 目录结构
 
 ```
 d:\code\AutoTest
@@ -401,13 +371,18 @@ d:\code\AutoTest
 │   │   ├── uploader.ts
 │   │   ├── logMonitor.ts
 │   │   ├── sshClient.ts
-│   │   └── scpClient.ts
+│   │   ├── scpClient.ts
+│   │   └── index.ts
 │   ├── ai/                 # AI 模块
 │   │   ├── chat.ts
 │   │   ├── providers.ts
+│   │   ├── sessionManager.ts
 │   │   └── index.ts
 │   ├── types/              # 类型定义
 │   │   └── index.ts
+│   ├── utils/              # 工具模块
+│   │   ├── logger.ts
+│   │   └── markdown.ts
 │   └── views/              # UI 视图
 │       ├── aiChatView.ts
 │       ├── logTreeView.ts
@@ -420,7 +395,10 @@ d:\code\AutoTest
 │   │   ├── logMonitor.test.ts
 │   │   ├── sshClient.test.ts
 │   │   ├── scpClient.test.ts
-│   │   └── ai.test.ts
+│   │   ├── ai.test.ts
+│   │   ├── aiStreaming.test.ts
+│   │   ├── sessionManager.test.ts
+│   │   └── markdown.test.ts
 │   ├── package.json
 │   ├── runTest.ts
 │   └── tsconfig.json
@@ -435,44 +413,44 @@ d:\code\AutoTest
 └── webpack.config.js       # webpack 配置
 ```
 
-## 12. 快速开始
+## 13. 快速开始
 
-### 12.1 安装依赖
+### 13.1 安装依赖
 
 ```bash
 npm install
 ```
 
-### 12.2 编译
+### 13.2 编译
 
 ```bash
-npm run compile
+npm run webpack-dev
 ```
 
-### 12.3 运行测试
+### 13.3 运行测试
 
 ```bash
 npm run test:unit
 ```
 
-### 12.4 调试
+### 13.4 调试
 
 1. 在 VSCode 中打开项目
 2. 按 F5 启动调试
 3. 在新窗口中测试插件功能
 
-### 12.5 打包
+### 13.5 打包
 
 ```bash
 npm run package
 vsce package
 ```
 
-## 13. 相关文档
+## 14. 相关文档
 
+- [功能使用文档](./FUNCTIONS.md)
 - [配置模块详细文档](./config.md)
 - [命令执行模块详细文档](./commandExecutor.md)
 - [日志监控模块详细文档](./logMonitor.md)
 - [AI 对话模块详细文档](./ai.md)
 - [AI 多模式架构设计](./ai-mode-design.md)
-- [功能使用文档](./FUNCTIONS.md)
