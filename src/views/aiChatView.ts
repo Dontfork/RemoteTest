@@ -165,11 +165,11 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         .bubble a { color: #3794ff; }
         .bubble strong { color: #ffffff; }
         .bubble em { color: #d0d0d0; }
-        .input-area { padding: 8px 12px; border-top: 1px solid #3c3c3c; background: transparent; }
-        .input-wrap { display: flex; gap: 6px; align-items: flex-end; }
-        textarea { flex: 1; padding: 6px 0; background: transparent; color: #cccccc; border: none; resize: none; font-family: inherit; font-size: 14px; line-height: 1.4; height: 20px; }
+        .input-area { padding: 10px 12px; border-top: 1px solid #3c3c3c; background: transparent; }
+        .input-wrap { display: flex; gap: 6px; align-items: center; }
+        textarea { flex: 1; padding: 4px 0; background: transparent; color: #cccccc; border: none; resize: none; font-family: inherit; font-size: 14px; line-height: 1.4; height: 20px; }
         textarea:focus { outline: none; }
-        button#sendBtn { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: transparent; color: #858585; border: none; cursor: pointer; transition: all 0.2s; margin-bottom: 1px; }
+        button#sendBtn { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: transparent; color: #858585; border: none; cursor: pointer; transition: all 0.2s; flex-shrink: 0; }
         button#sendBtn:hover { color: #cccccc; }
         button#sendBtn:disabled { color: #3c3c3c; cursor: not-allowed; }
         button#sendBtn svg { width: 16px; height: 16px; stroke: currentColor; stroke-width: 1.5; fill: none; }
