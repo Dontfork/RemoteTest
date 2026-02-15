@@ -43,6 +43,25 @@
 
 ## 3. 类型定义
 
+### 3.0 路径配置重要说明
+
+> **⚠️ 重要：所有路径配置必须使用绝对路径**
+
+| 配置项 | 路径类型 | 示例 |
+|--------|----------|------|
+| `server.privateKeyPath` | 本地绝对路径 | `C:\Users\user\.ssh\id_rsa` 或 `/home/user/.ssh/id_rsa` |
+| `server.localProjectPath` | 本地绝对路径 | `D:\Projects\Test` 或 `/home/user/projects/test` |
+| `server.remoteDirectory` | 远程绝对路径 | `/tmp/autotest` 或 `/home/user/test` |
+| `logs.directories[].path` | 远程绝对路径 | `/var/log/app` 或 `/home/user/logs` |
+| `logs.downloadPath` | 本地相对/绝对路径 | `./downloads` 或 `D:\logs` |
+
+**注意事项**：
+- 本地路径格式根据操作系统而定：
+  - Windows: `D:\path\to\file` 或 `C:\Users\user\...`
+  - Linux/macOS: `/home/user/path/to/file`
+- 远程路径格式取决于远程服务器操作系统（通常为 Linux，使用 `/` 开头的绝对路径）
+- `logs.downloadPath` 支持相对路径，相对于工作区目录
+
 ### 3.1 完整配置结构
 
 ```typescript

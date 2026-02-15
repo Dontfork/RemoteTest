@@ -48,6 +48,12 @@ vsce package
 
 在项目根目录创建 `.vscode/autotest-config.json` 文件：
 
+> **⚠️ 路径配置说明**：所有路径必须使用绝对路径
+> - `privateKeyPath`: 本地私钥绝对路径，如 `C:\Users\user\.ssh\id_rsa`
+> - `remoteDirectory`: 远程服务器绝对路径，如 `/tmp/autotest`
+> - `logs.directories[].path`: 远程服务器绝对路径，如 `/var/log/myapp`
+> - `logs.downloadPath`: 支持相对路径（相对于工作区）或绝对路径
+
 ```json
 {
   "server": {
