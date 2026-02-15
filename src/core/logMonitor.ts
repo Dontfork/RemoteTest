@@ -122,7 +122,8 @@ export class LogMonitor {
 }
 
 export function formatSize(bytes: number): string {
-    if (!bytes || bytes < 1024) return (bytes || 0) + ' B';
+    if (!bytes || bytes < 0) return '0 B';
+    if (bytes < 1024) return bytes + ' B';
     if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
     if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
     return (bytes / 1073741824).toFixed(2) + ' GB';
@@ -130,7 +131,13 @@ export function formatSize(bytes: number): string {
 
 export function formatDate(date: Date): string {
     try {
-        return new Date(date).toLocaleString('zh-CN');
+        const d = new Date(date);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const hour = String(d.getHours()).padStart(2, '0');
+        const minute = String(d.getMinutes()).padStart(2, '0');
+        return `${year}/${month}/${day} ${hour}:${minute}`;
     } catch {
         return '';
     }
