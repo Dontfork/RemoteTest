@@ -1,4 +1,5 @@
 const path = require('path');
+const webpack = require('webpack');
 
 module.exports = {
     target: 'node',
@@ -13,7 +14,10 @@ module.exports = {
         vscode: 'commonjs vscode'
     },
     resolve: {
-        extensions: ['.ts', '.js']
+        extensions: ['.ts', '.js'],
+        alias: {
+            'cpu-features': false
+        }
     },
     module: {
         rules: [
@@ -26,7 +30,23 @@ module.exports = {
                     }
                 ]
             }
-        ]
+        ],
+        unknownContextCritical: false,
+        exprContextCritical: false
     },
-    devtool: 'source-map'
+    plugins: [
+        new webpack.IgnorePlugin({
+            resourceRegExp: /^cpu-features$/
+        }),
+        new webpack.NormalModuleReplacementPlugin(
+            /\.\/crypto\/build\/Release\/sshcrypto\.node$/,
+            path.resolve(__dirname, 'src/stubs/empty.js')
+        )
+    ],
+    devtool: 'source-map',
+    ignoreWarnings: [
+        {
+            module: /ssh2\/lib\/protocol\/crypto\.js/
+        }
+    ]
 };
