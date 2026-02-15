@@ -101,16 +101,10 @@ export class QWenProvider implements AIProvider {
                         try {
                             const json = JSON.parse(data);
                             const content = json?.output?.choices?.[0]?.message?.content;
-                            if (content !== undefined && content !== null) {
+                            if (content !== undefined && content !== null && content !== '') {
                                 const contentStr = String(content);
-                                if (contentStr.length > fullContent.length) {
-                                    const chunkText = contentStr.slice(fullContent.length);
-                                    fullContent = contentStr;
-                                    onChunk(chunkText);
-                                } else if (contentStr && !fullContent) {
-                                    fullContent = contentStr;
-                                    onChunk(contentStr);
-                                }
+                                fullContent += contentStr;
+                                onChunk(contentStr);
                             }
                         } catch (parseErr) {
                             // 忽略解析错误
