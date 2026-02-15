@@ -142,9 +142,9 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1e1e1e; color: #cccccc; height: 100vh; display: flex; flex-direction: column; }
         .toolbar { padding: 8px 12px; border-bottom: 1px solid #3c3c3c; display: flex; gap: 8px; align-items: center; position: relative; }
-        .toolbar button { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 12px; background: transparent; color: #cccccc; border: 1px solid #3c3c3c; border-radius: 4px; cursor: pointer; font-size: 13px; transition: all 0.2s; }
-        .toolbar button:hover { background: #2d2d2d; border-color: #0e639c; color: #ffffff; }
-        .toolbar button svg { width: 16px; height: 16px; stroke: currentColor; stroke-width: 1.5; fill: none; }
+        .toolbar button { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: transparent; color: #858585; border: none; cursor: pointer; transition: all 0.2s; }
+        .toolbar button:hover { color: #cccccc; }
+        .toolbar button svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 1.5; fill: none; }
         .messages { flex: 1; overflow-y: auto; padding: 16px; }
         .msg { margin-bottom: 16px; display: flex; }
         .msg.user { justify-content: flex-end; }
@@ -192,13 +192,11 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
 </head>
 <body>
     <div class="toolbar">
-        <button id="newBtn">
+        <button id="newBtn" title="新对话">
             <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-            新对话
         </button>
-        <button id="historyBtn">
+        <button id="historyBtn" title="历史">
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-            历史
         </button>
         <div id="historyPanel" class="history-panel"></div>
     </div>
