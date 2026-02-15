@@ -169,10 +169,10 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         .input-wrap { display: flex; gap: 8px; align-items: flex-end; }
         textarea { flex: 1; padding: 0 0 2px 0; background: transparent; color: #cccccc; border: none; border-bottom: 1px solid #3c3c3c; resize: none; font-family: inherit; font-size: 14px; line-height: 20px; height: 22px; }
         textarea:focus { outline: none; border-bottom-color: #858585; }
-        button#sendBtn { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; background: transparent; color: #858585; border: none; cursor: pointer; transition: all 0.2s; flex-shrink: 0; margin-bottom: 1px; }
+        button#sendBtn { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; background: transparent; color: #858585; border: none; cursor: pointer; transition: all 0.2s; flex-shrink: 0; margin-bottom: -8px; }
         button#sendBtn:hover { color: #cccccc; }
         button#sendBtn:disabled { color: #3c3c3c; cursor: not-allowed; }
-        button#sendBtn svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 1.5; fill: none; }
+        button#sendBtn svg { width: 20px; height: 20px; stroke: currentColor; stroke-width: 1.5; fill: none; }
         .welcome { text-align: center; padding: 60px 20px; color: #858585; }
         .welcome-icon { width: 48px; height: 48px; margin: 0 auto 16px; stroke: #858585; stroke-width: 1; fill: none; }
         .welcome h2 { color: #cccccc; margin-bottom: 8px; font-weight: 400; }
