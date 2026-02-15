@@ -31,7 +31,8 @@ export class QWenProvider implements AIProvider {
                 timeout: 60000
             });
 
-            const content = response.data?.output?.choices?.[0]?.message?.content || '';
+            const rawContent = response.data?.output?.choices?.[0]?.message?.content;
+            const content = rawContent !== undefined && rawContent !== null ? String(rawContent) : '';
             if (content) {
                 logAI(content);
             }
@@ -87,7 +88,8 @@ export class QWenProvider implements AIProvider {
 
             response.data.on('data', (chunk: Buffer) => {
                 hasData = true;
-                buffer += chunk.toString('utf-8');
+                const chunkStr = chunk.toString('utf-8');
+                buffer += chunkStr;
                 const lines = buffer.split('\n');
                 buffer = lines.pop() || '';
 
@@ -98,13 +100,19 @@ export class QWenProvider implements AIProvider {
                         
                         try {
                             const json = JSON.parse(data);
-                            const content = json?.output?.choices?.[0]?.message?.content || '';
-                            if (content && content.length > fullContent.length) {
-                                const chunkText = content.slice(fullContent.length);
-                                fullContent = content;
-                                onChunk(chunkText);
+                            const content = json?.output?.choices?.[0]?.message?.content;
+                            if (content !== undefined && content !== null) {
+                                const contentStr = String(content);
+                                if (contentStr.length > fullContent.length) {
+                                    const chunkText = contentStr.slice(fullContent.length);
+                                    fullContent = contentStr;
+                                    onChunk(chunkText);
+                                } else if (contentStr && !fullContent) {
+                                    fullContent = contentStr;
+                                    onChunk(contentStr);
+                                }
                             }
-                        } catch {
+                        } catch (parseErr) {
                             // 忽略解析错误
                         }
                     }

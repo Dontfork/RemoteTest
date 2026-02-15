@@ -111,7 +111,7 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
             } else {
                 this.view?.webview.postMessage({
                     command: 'streamComplete',
-                    data: fullContent
+                    data: response.content || fullContent
                 });
                 this.sendSessions();
             }
@@ -221,10 +221,18 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
                     if (bubble) {
                         if (bubble.textContent === '思考中...') bubble.textContent = '';
                         bubble.textContent += m.data;
+                        messages.scrollTop = messages.scrollHeight;
                     }
                 }
             } else if (m.command === 'streamComplete') {
                 sendBtn.disabled = false;
+                const lastMsg = messages.lastChild;
+                if (lastMsg && lastMsg.classList.contains('assistant')) {
+                    const bubble = lastMsg.querySelector('.bubble');
+                    if (bubble && m.data) {
+                        bubble.textContent = m.data;
+                    }
+                }
             } else if (m.command === 'streamError') {
                 addMessage('error', m.error);
                 sendBtn.disabled = false;
