@@ -77,14 +77,14 @@ export class FileUploader {
         }
 
         if (!project.commands || project.commands.length === 0) {
-            vscode.window.showWarningMessage('该工程未配置命令');
+            vscode.window.showWarningMessage('该工程未配置命令，无法运行用例');
             return;
         }
 
         const availableCommands = project.commands.filter(cmd => cmd.selectable === undefined);
         
         if (availableCommands.length === 0) {
-            vscode.window.showWarningMessage('没有可用的命令（请配置未标记selectable的命令）');
+            vscode.window.showWarningMessage('可用命令数量为 0，无法运行用例。所有命令都被标记为可选，请检查命令配置。');
             return;
         }
 
