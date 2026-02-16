@@ -81,10 +81,10 @@ export class FileUploader {
             return;
         }
 
-        const availableCommands = project.commands.filter(cmd => cmd.selectable === undefined);
+        const availableCommands = project.commands.filter(cmd => cmd.selectable !== true);
         
         if (availableCommands.length === 0) {
-            vscode.window.showWarningMessage('可用命令数量为 0，无法运行用例。所有命令都被标记为可选，请检查命令配置。');
+            vscode.window.showWarningMessage('可用命令数量为 0，无法运行用例。所有命令都被标记为可选（selectable: true）。');
             return;
         }
 

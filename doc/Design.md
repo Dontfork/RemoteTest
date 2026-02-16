@@ -345,6 +345,17 @@ interface ProjectConfig {
 | includePatterns | 包含模式数组，只显示匹配这些模式的行（为空时显示所有行） |
 | excludePatterns | 排除模式数组，排除匹配这些模式的行 |
 | colorRules | 颜色规则数组，定义匹配模式和对应颜色 |
+| selectable | 命令可见性控制，默认为 false（运行用例可用，快捷命令不可用） |
+
+**selectable 配置说明**:
+- `selectable: false` 或未配置：命令在运行用例时自动执行，不在快捷命令中显示
+- `selectable: true`：命令仅在快捷命令中显示，不在运行用例时自动执行
+
+| selectable 值 | 快捷命令 | 运行用例 |
+|---------------|----------|----------|
+| 未配置 | ✗ 不显示 | ✓ 显示 |
+| `false` | ✗ 不显示 | ✓ 显示 |
+| `true` | ✓ 显示 | ✗ 不显示 |
 
 **颜色规则 (OutputColorRule)**:
 

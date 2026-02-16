@@ -24,7 +24,7 @@ export class QuickCommandDetector {
             }
 
             const quickCommands = project.commands.filter(cmd => {
-                if (cmd.selectable === true) {
+                if (cmd.selectable !== true) {
                     return false;
                 }
 

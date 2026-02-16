@@ -227,6 +227,11 @@ vsce package
 | `includePatterns` | 包含匹配模式（只保留匹配的行） |
 | `excludePatterns` | 排除匹配模式（排除匹配的行） |
 | `colorRules` | 颜色规则（根据正则匹配渲染颜色） |
+| `selectable` | 命令可见性控制，默认 false（运行用例可用，快捷命令不可用） |
+
+**selectable 配置说明**:
+- 未配置或 `false`：命令在运行用例时显示，不在快捷命令中显示
+- `true`：命令仅在快捷命令中显示，不在运行用例时显示
 
 ### 支持的命令变量
 
