@@ -814,5 +814,37 @@ describe('Config Validator Module - 配置验证模块测试', () => {
             
             assert.ok(result.warnings.some((w: string) => w.includes('日志目录') && w.includes('path')));
         });
+
+        it('验证未知字段检测 - 应警告', () => {
+            const config: any = {
+                projects: [{
+                    name: 'TestProject',
+                    localPath: '/path/to/project',
+                    server: {
+                        host: '192.168.1.1',
+                        port: 22,
+                        username: 'user',
+                        password: 'pass',
+                        remoteDirectory: '/home/user',
+                        unknownField: 'value'
+                    },
+                    commands: [{
+                        name: 'TestCmd',
+                        executeCommand: 'echo test',
+                        unknownCmdField: 'value'
+                    }],
+                    unknownProjectField: 'value'
+                }],
+                unknownRootField: 'value'
+            };
+            const result = validateConfig(config);
+            
+            assert.ok(result.unknownKeys.length > 0);
+            assert.ok(result.unknownKeys.some((k: string) => k.includes('unknownRootField')));
+            assert.ok(result.unknownKeys.some((k: string) => k.includes('unknownProjectField')));
+            assert.ok(result.unknownKeys.some((k: string) => k.includes('unknownField')));
+            assert.ok(result.unknownKeys.some((k: string) => k.includes('unknownCmdField')));
+            assert.ok(result.warnings.some((w: string) => w.includes('未知字段')));
+        });
     });
 });

@@ -5,6 +5,7 @@ export interface ConfigValidationResult {
     errors: string[];
     warnings: string[];
     missingFields: MissingField[];
+    unknownKeys: string[];
 }
 
 export interface MissingField {
@@ -14,6 +15,24 @@ export interface MissingField {
     project?: string;
     defaultValue: any;
 }
+
+const VALID_ROOT_KEYS = ['projects', 'ai', 'refreshInterval'];
+
+const VALID_PROJECT_KEYS = ['name', 'localPath', 'enabled', 'server', 'commands', 'logs'];
+
+const VALID_SERVER_KEYS = ['host', 'port', 'username', 'password', 'privateKeyPath', 'remoteDirectory'];
+
+const VALID_COMMAND_KEYS = ['name', 'executeCommand', 'includePatterns', 'excludePatterns', 'colorRules', 'runnable'];
+
+const VALID_LOGS_KEYS = ['directories', 'downloadPath'];
+
+const VALID_LOG_DIRECTORY_KEYS = ['name', 'path'];
+
+const VALID_AI_KEYS = ['provider', 'qwen', 'openai'];
+
+const VALID_QWEN_KEYS = ['apiKey', 'apiUrl', 'model'];
+
+const VALID_OPENAI_KEYS = ['apiKey', 'apiUrl', 'model'];
 
 const REQUIRED_PROJECT_FIELDS = [
     { path: 'name', field: 'name', defaultValue: '未命名工程' },
@@ -94,10 +113,27 @@ function isValidUrl(url: string): boolean {
     }
 }
 
+function checkUnknownKeys(obj: any, validKeys: string[], path: string): string[] {
+    const unknownKeys: string[] = [];
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) {
+        return unknownKeys;
+    }
+    
+    for (const key of Object.keys(obj)) {
+        if (!validKeys.includes(key)) {
+            unknownKeys.push(`${path}.${key}`);
+        }
+    }
+    return unknownKeys;
+}
+
 export function validateConfig(config: any): ConfigValidationResult {
     const errors: string[] = [];
     const warnings: string[] = [];
     const missingFields: MissingField[] = [];
+    const unknownKeys: string[] = [];
+
+    unknownKeys.push(...checkUnknownKeys(config, VALID_ROOT_KEYS, 'root'));
 
     if (!config.projects || !Array.isArray(config.projects)) {
         errors.push('配置文件缺少 "projects" 数组');
@@ -106,7 +142,7 @@ export function validateConfig(config: any): ConfigValidationResult {
             field: 'projects',
             defaultValue: []
         });
-        return { isValid: false, errors, warnings, missingFields };
+        return { isValid: false, errors, warnings, missingFields, unknownKeys };
     }
 
     if (config.projects.length === 0) {
@@ -126,6 +162,8 @@ export function validateConfig(config: any): ConfigValidationResult {
     for (let i = 0; i < config.projects.length; i++) {
         const project = config.projects[i];
         const projectPrefix = `projects[${i}]`;
+
+        unknownKeys.push(...checkUnknownKeys(project, VALID_PROJECT_KEYS, projectPrefix));
 
         for (const required of REQUIRED_PROJECT_FIELDS) {
             if (!project[required.field]) {
@@ -162,6 +200,8 @@ export function validateConfig(config: any): ConfigValidationResult {
                 }
             });
         } else {
+            unknownKeys.push(...checkUnknownKeys(project.server, VALID_SERVER_KEYS, `${projectPrefix}.server`));
+
             for (const required of REQUIRED_SERVER_FIELDS) {
                 if (project.server[required.field] === undefined || project.server[required.field] === '') {
                     const message = `工程 "${project.name || i + 1}" 的服务器配置缺少 "${required.path}"`;
@@ -194,6 +234,8 @@ export function validateConfig(config: any): ConfigValidationResult {
                 const cmd = project.commands[j];
                 const cmdPrefix = `projects[${i}].commands[${j}]`;
 
+                unknownKeys.push(...checkUnknownKeys(cmd, VALID_COMMAND_KEYS, cmdPrefix));
+
                 if (!cmd.name || typeof cmd.name !== 'string') {
                     warnings.push(`工程 "${project.name || i + 1}" 的命令 ${j + 1} 缺少 name 字段`);
                 }
@@ -221,9 +263,13 @@ export function validateConfig(config: any): ConfigValidationResult {
         }
 
         if (project.logs) {
+            unknownKeys.push(...checkUnknownKeys(project.logs, VALID_LOGS_KEYS, `${projectPrefix}.logs`));
+
             if (project.logs.directories && Array.isArray(project.logs.directories)) {
                 for (let k = 0; k < project.logs.directories.length; k++) {
                     const dir = project.logs.directories[k];
+                    unknownKeys.push(...checkUnknownKeys(dir, VALID_LOG_DIRECTORY_KEYS, `${projectPrefix}.logs.directories[${k}]`));
+
                     if (!dir.path || typeof dir.path !== 'string') {
                         warnings.push(`工程 "${project.name || i + 1}" 的日志目录 ${k + 1} 缺少 path 字段`);
                     }
@@ -250,6 +296,8 @@ export function validateConfig(config: any): ConfigValidationResult {
     if (!config.ai || typeof config.ai !== 'object') {
         warnings.push('配置文件缺少 "ai" 配置，将使用默认 AI 配置');
     } else {
+        unknownKeys.push(...checkUnknownKeys(config.ai, VALID_AI_KEYS, 'ai'));
+
         if (config.ai.provider && !['qwen', 'openai'].includes(config.ai.provider)) {
             errors.push(`AI 配置的 provider "${config.ai.provider}" 无效，只支持 "qwen" 或 "openai"`);
         }
@@ -264,6 +312,8 @@ export function validateConfig(config: any): ConfigValidationResult {
             if (!config.ai.qwen || typeof config.ai.qwen !== 'object') {
                 warnings.push('QWen AI 配置缺少 qwen 配置对象');
             } else {
+                unknownKeys.push(...checkUnknownKeys(config.ai.qwen, VALID_QWEN_KEYS, 'ai.qwen'));
+
                 if (!config.ai.qwen.apiKey) {
                     warnings.push('QWen AI 配置缺少 apiKey，AI 对话功能可能无法使用');
                 }
@@ -275,6 +325,8 @@ export function validateConfig(config: any): ConfigValidationResult {
             if (!config.ai.openai || typeof config.ai.openai !== 'object') {
                 warnings.push('OpenAI 配置缺少 openai 配置对象');
             } else {
+                unknownKeys.push(...checkUnknownKeys(config.ai.openai, VALID_OPENAI_KEYS, 'ai.openai'));
+
                 if (!config.ai.openai.apiKey) {
                     warnings.push('OpenAI 配置缺少 apiKey，AI 对话功能可能无法使用');
                 }
@@ -289,11 +341,16 @@ export function validateConfig(config: any): ConfigValidationResult {
         warnings.push('未配置 refreshInterval，将使用默认值 0（禁用自动刷新）');
     }
 
+    if (unknownKeys.length > 0) {
+        warnings.push(`配置文件包含未知字段: ${unknownKeys.join(', ')}`);
+    }
+
     return {
         isValid: errors.length === 0,
         errors,
         warnings,
-        missingFields
+        missingFields,
+        unknownKeys
     };
 }
 
