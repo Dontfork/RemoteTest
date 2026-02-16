@@ -232,13 +232,8 @@ export function loadConfig(workspacePath: string): AutoTestConfig {
                 if (project.enabled === undefined) {
                     project.enabled = true;
                 }
-                if (!project.commands || project.commands.length === 0) {
-                    project.commands = [{
-                        name: "默认命令",
-                        executeCommand: "pytest {filePath} -v",
-                        includePatterns: ["error", "failed", "FAILED", "Error", "ERROR"],
-                        excludePatterns: []
-                    }];
+                if (!project.commands) {
+                    project.commands = [];
                 }
                 for (const cmd of project.commands) {
                     if (!cmd.name) {
