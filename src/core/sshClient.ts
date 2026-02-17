@@ -6,7 +6,8 @@ import { ServerConfig, CommandConfig } from '../types';
 import { 
     filterCommandOutput, 
     applyColorRules, 
-    getColorRules 
+    getColorRules,
+    stripAnsiEscapeCodes
 } from '../utils/outputFilter';
 
 export class SSHClient {
@@ -136,7 +137,8 @@ export async function executeRemoteCommand(
                     exitCode = code;
                     
                     const combinedOutput = stdout + stderr;
-                    const filteredOutput = filterCommandOutput(combinedOutput, includePatterns, excludePatterns);
+                    const cleanOutput = stripAnsiEscapeCodes(combinedOutput);
+                    const filteredOutput = filterCommandOutput(cleanOutput, includePatterns, excludePatterns);
                     
                     if (outputChannel) {
                         outputChannel.appendLine(`├─ 输出 ${'─'.repeat(52)}`);
@@ -174,4 +176,4 @@ export async function executeRemoteCommand(
     }
 }
 
-export { filterCommandOutput, applyColorRules, getColorRules } from '../utils/outputFilter';
+export { filterCommandOutput, applyColorRules, getColorRules, stripAnsiEscapeCodes } from '../utils/outputFilter';
