@@ -13,7 +13,7 @@ const ANSI_COLORS = {
     reset: '\x1b[0m'
 };
 
-const ANSI_ESCAPE_REGEX = /\x1b\[[0-9;]*m/g;
+const ANSI_ESCAPE_REGEX = /\x1b\[[0-9;]*m|\[\d+(?:;\d+)*m/g;
 
 export function stripAnsiEscapeCodes(text: string): string {
     return text.replace(ANSI_ESCAPE_REGEX, '');
