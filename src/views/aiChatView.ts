@@ -75,6 +75,9 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
                 case 'getModels':
                     this.sendAvailableModels();
                     break;
+                case 'importPrompt':
+                    this.handleImportPrompt();
+                    break;
             }
         });
 
@@ -129,11 +132,36 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         });
     }
 
-    private async handleSendMessage(userMessage: string): Promise<void> {
+    private async handleImportPrompt(): Promise<void> {
+        const uris = await vscode.window.showOpenDialog({
+            canSelectFiles: true,
+            canSelectFolders: false,
+            canSelectMany: false,
+            filters: {
+                'Prompt Files': ['txt', 'md']
+            },
+            title: '选择 Prompt 文件'
+        });
+
+        if (uris && uris.length > 0) {
+            try {
+                const content = await vscode.workspace.fs.readFile(uris[0]);
+                const text = Buffer.from(content).toString('utf-8');
+                this.view?.webview.postMessage({
+                    command: 'promptContent',
+                    data: text
+                });
+            } catch (error: any) {
+                vscode.window.showErrorMessage('读取文件失败: ' + error.message);
+            }
+        }
+    }
+
+    private async handleSendMessage(data: { message: string; systemPrompt?: string }): Promise<void> {
         try {
             let fullContent = '';
             
-            const response = await this.aiChat.sendMessageStream(userMessage, async (chunk) => {
+            const response = await this.aiChat.sendMessageStream(data.message, data.systemPrompt, async (chunk) => {
                 fullContent += chunk;
                 const htmlContent = await marked(fullContent);
                 this.view?.webview.postMessage({
@@ -232,6 +260,19 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         .history-item .delete-btn:hover { color: #f48771; }
         .history-item .delete-btn svg { width: 14px; height: 14px; stroke: currentColor; stroke-width: 1.5; fill: none; }
         .no-history { padding: 24px; text-align: center; color: #858585; }
+        .prompt-area { border-bottom: 1px solid #3c3c3c; padding: 8px 12px; }
+        .prompt-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .prompt-label { font-size: 11px; color: #858585; }
+        .prompt-actions { display: flex; gap: 8px; }
+        .prompt-actions button { background: transparent; color: #858585; border: none; cursor: pointer; padding: 2px 6px; font-size: 11px; display: flex; align-items: center; gap: 4px; }
+        .prompt-actions button:hover { color: #cccccc; }
+        .prompt-actions button svg { width: 12px; height: 12px; stroke: currentColor; stroke-width: 1.5; fill: none; }
+        #promptInput { width: 100%; min-height: 40px; max-height: 100px; padding: 4px 0; background: transparent; color: #cccccc; border: none; border-bottom: 1px solid #3c3c3c; resize: vertical; font-family: inherit; font-size: 12px; line-height: 1.5; }
+        #promptInput:focus { outline: none; border-bottom-color: #858585; }
+        #promptInput::placeholder { color: #5a5a5a; }
+        .prompt-collapsed #promptInput { display: none; }
+        .prompt-toggle { transform: rotate(180deg); transition: transform 0.2s; }
+        .prompt-collapsed .prompt-toggle { transform: rotate(0deg); }
     </style>
 </head>
 <body>
@@ -250,6 +291,24 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
             </button>
         </div>
         <div id="historyPanel" class="history-panel"></div>
+    </div>
+    <div id="promptArea" class="prompt-area">
+        <div class="prompt-header">
+            <span class="prompt-label">系统提示词</span>
+            <div class="prompt-actions">
+                <button id="importPromptBtn" title="导入文件">
+                    <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+                    导入
+                </button>
+                <button id="clearPromptBtn" title="清空">
+                    <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
+                <button id="togglePromptBtn" class="prompt-toggle" title="折叠">
+                    <svg viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></svg>
+                </button>
+            </div>
+        </div>
+        <textarea id="promptInput" placeholder="输入系统提示词，或点击导入按钮选择文件..."></textarea>
     </div>
     <div id="messages" class="messages">
         <div class="welcome">
@@ -275,10 +334,16 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         const historyBtn = document.getElementById('historyBtn');
         const historyPanel = document.getElementById('historyPanel');
         const modelSelect = document.getElementById('modelSelect');
+        const promptArea = document.getElementById('promptArea');
+        const promptInput = document.getElementById('promptInput');
+        const importPromptBtn = document.getElementById('importPromptBtn');
+        const clearPromptBtn = document.getElementById('clearPromptBtn');
+        const togglePromptBtn = document.getElementById('togglePromptBtn');
         let sessions = [];
         let currentSessionId = null;
         let availableModels = [];
         let currentModel = null;
+        let systemPrompt = '';
         
         function escapeHtml(text) {
             return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -333,11 +398,12 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         function send() {
             const text = input.value.trim();
             if (!text) return;
+            systemPrompt = promptInput.value.trim();
             addMessage('user', escapeHtml(text));
             input.value = '';
             sendBtn.disabled = true;
             addMessage('assistant', '思考中...');
-            vscode.postMessage({ command: 'sendMessage', data: text });
+            vscode.postMessage({ command: 'sendMessage', data: { message: text, systemPrompt: systemPrompt } });
         }
         
         sendBtn.onclick = send;
@@ -362,6 +428,19 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
             if (selectedModel && selectedModel !== currentModel) {
                 vscode.postMessage({ command: 'switchModel', modelName: selectedModel });
             }
+        };
+        
+        importPromptBtn.onclick = function() {
+            vscode.postMessage({ command: 'importPrompt' });
+        };
+        
+        clearPromptBtn.onclick = function() {
+            promptInput.value = '';
+            systemPrompt = '';
+        };
+        
+        togglePromptBtn.onclick = function() {
+            promptArea.classList.toggle('prompt-collapsed');
         };
         
         historyPanel.onclick = function(e) {
@@ -419,6 +498,9 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
             } else if (m.command === 'currentModel') {
                 currentModel = m.data;
                 renderModels();
+            } else if (m.command === 'promptContent') {
+                promptInput.value = m.data;
+                systemPrompt = m.data;
             }
         };
         

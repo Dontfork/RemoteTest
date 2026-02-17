@@ -123,6 +123,35 @@ class MockSessionManager {
         return session;
     }
 
+    insertMessage(sessionId: string, index: number, message: AIMessage): ChatSession | null {
+        const session = this.sessions.get(sessionId);
+        if (!session) return null;
+        
+        session.messages.splice(index, 0, message);
+        session.updatedAt = Date.now();
+        
+        this.saveSession(session);
+        this.emitChange();
+        
+        return session;
+    }
+
+    updateMessage(sessionId: string, message: AIMessage, updates: Partial<AIMessage>): ChatSession | null {
+        const session = this.sessions.get(sessionId);
+        if (!session) return null;
+        
+        const msgIndex = session.messages.indexOf(message);
+        if (msgIndex === -1) return null;
+        
+        session.messages[msgIndex] = { ...message, ...updates };
+        session.updatedAt = Date.now();
+        
+        this.saveSession(session);
+        this.emitChange();
+        
+        return session;
+    }
+
     deleteSession(sessionId: string): boolean {
         if (!this.sessions.has(sessionId)) return false;
         
@@ -481,6 +510,56 @@ describe('SessionManager - 会话管理器测试', () => {
             
             const current = sessionManager.getCurrentSession();
             assert.strictEqual(current, null);
+        });
+    });
+
+    describe('insertMessage - 插入消息', () => {
+        it('在指定位置插入消息', () => {
+            const session = sessionManager.createSession();
+            sessionManager.addMessage(session.id, { role: 'user', content: 'Hello' });
+            sessionManager.addMessage(session.id, { role: 'assistant', content: 'Hi' });
+            
+            sessionManager.insertMessage(session.id, 0, { role: 'system', content: 'You are a helper' });
+            
+            const current = sessionManager.getCurrentSession();
+            assert.strictEqual(current?.messages.length, 3);
+            assert.strictEqual(current?.messages[0].role, 'system');
+            assert.strictEqual(current?.messages[0].content, 'You are a helper');
+        });
+
+        it('插入消息后更新updatedAt时间', async () => {
+            const session = sessionManager.createSession();
+            const originalTime = session.updatedAt;
+            
+            await new Promise(r => setTimeout(r, 10));
+            sessionManager.insertMessage(session.id, 0, { role: 'system', content: 'System prompt' });
+            
+            const updated = sessionManager.getCurrentSession();
+            assert.ok(updated!.updatedAt > originalTime);
+        });
+    });
+
+    describe('updateMessage - 更新消息', () => {
+        it('更新指定消息内容', () => {
+            const session = sessionManager.createSession();
+            sessionManager.addMessage(session.id, { role: 'system', content: 'Old prompt' });
+            
+            const current = sessionManager.getCurrentSession();
+            const systemMsg = current?.messages[0];
+            if (systemMsg) {
+                sessionManager.updateMessage(session.id, systemMsg, { content: 'New prompt' });
+            }
+            
+            const updated = sessionManager.getCurrentSession();
+            assert.strictEqual(updated?.messages[0].content, 'New prompt');
+        });
+
+        it('更新不存在的消息返回null', () => {
+            const session = sessionManager.createSession();
+            
+            const result = sessionManager.updateMessage(session.id, { role: 'system', content: 'test' }, { content: 'new' });
+            
+            assert.strictEqual(result, null);
         });
     });
 });

@@ -239,3 +239,56 @@ describe('AIChatView Session Management - 会话管理测试', () => {
         assert.ok(source.includes('this.aiChat.createNewSession()'));
     });
 });
+
+describe('AIChatView System Prompt - 系统提示词测试', () => {
+    it('模板应包含prompt区域', () => {
+        const template = getTemplate();
+        assert.ok(template.includes('id="promptArea"'));
+        assert.ok(template.includes('prompt-area'));
+    });
+
+    it('模板应包含prompt输入框', () => {
+        const template = getTemplate();
+        assert.ok(template.includes('id="promptInput"'));
+    });
+
+    it('模板应包含导入prompt按钮', () => {
+        const template = getTemplate();
+        assert.ok(template.includes('id="importPromptBtn"'));
+    });
+
+    it('模板应包含清空prompt按钮', () => {
+        const template = getTemplate();
+        assert.ok(template.includes('id="clearPromptBtn"'));
+    });
+
+    it('模板应包含折叠prompt按钮', () => {
+        const template = getTemplate();
+        assert.ok(template.includes('id="togglePromptBtn"'));
+    });
+
+    it('应处理importPrompt命令', () => {
+        const source = getSourceFile();
+        assert.ok(source.includes("case 'importPrompt'"));
+    });
+
+    it('应有handleImportPrompt方法', () => {
+        const source = getSourceFile();
+        assert.ok(source.includes('private async handleImportPrompt'));
+    });
+
+    it('应处理promptContent消息', () => {
+        const template = getTemplate();
+        assert.ok(template.includes("if (m.command === 'promptContent')"));
+    });
+
+    it('发送消息时应包含systemPrompt', () => {
+        const template = getTemplate();
+        assert.ok(template.includes('systemPrompt: systemPrompt'));
+    });
+
+    it('handleSendMessage应接收systemPrompt参数', () => {
+        const source = getSourceFile();
+        assert.ok(source.includes('data: { message: string; systemPrompt?: string }'));
+    });
+});

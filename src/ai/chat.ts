@@ -119,7 +119,8 @@ export class AIChat {
 
     async sendMessageStream(
         userMessage: string, 
-        onChunk: (chunk: string) => void
+        systemPrompt?: string,
+        onChunk?: (chunk: string) => void
     ): Promise<AIResponse> {
         const config = getConfig();
         
@@ -144,9 +145,18 @@ export class AIChat {
             session = this.createNewSession();
         }
 
+        if (systemPrompt && systemPrompt.trim()) {
+            const existingSystemMsg = session.messages.find(m => m.role === 'system');
+            if (existingSystemMsg) {
+                this.sessionManager.updateMessage(session.id, existingSystemMsg, { content: systemPrompt });
+            } else {
+                this.sessionManager.insertMessage(session.id, 0, { role: 'system', content: systemPrompt });
+            }
+        }
+
         this.sessionManager.addMessage(session.id, { role: 'user', content: userMessage });
 
-        const response = await this.provider.sendStream(session.messages, onChunk);
+        const response = await this.provider.sendStream(session.messages, onChunk || (() => {}));
 
         if (response.content && !response.error) {
             this.sessionManager.addMessage(session.id, { role: 'assistant', content: response.content });

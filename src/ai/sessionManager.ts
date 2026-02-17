@@ -123,6 +123,35 @@ export class SessionManager {
         return session;
     }
 
+    insertMessage(sessionId: string, index: number, message: AIMessage): ChatSession | null {
+        const session = this.sessions.get(sessionId);
+        if (!session) return null;
+        
+        session.messages.splice(index, 0, message);
+        session.updatedAt = Date.now();
+        
+        this.saveSession(session);
+        this.emitChange();
+        
+        return session;
+    }
+
+    updateMessage(sessionId: string, message: AIMessage, updates: Partial<AIMessage>): ChatSession | null {
+        const session = this.sessions.get(sessionId);
+        if (!session) return null;
+        
+        const msgIndex = session.messages.indexOf(message);
+        if (msgIndex === -1) return null;
+        
+        session.messages[msgIndex] = { ...message, ...updates };
+        session.updatedAt = Date.now();
+        
+        this.saveSession(session);
+        this.emitChange();
+        
+        return session;
+    }
+
     deleteSession(sessionId: string): boolean {
         if (!this.sessions.has(sessionId)) return false;
         
