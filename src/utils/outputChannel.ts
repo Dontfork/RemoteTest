@@ -9,7 +9,6 @@ export class OutputChannelManager {
     private static instance: OutputChannelManager;
     private logChannel: vscode.LogOutputChannel | null = null;
     private testOutputChannel: vscode.LogOutputChannel | null = null;
-    private terminal: vscode.Terminal | null = null;
 
     private constructor() {}
 
@@ -34,20 +33,6 @@ export class OutputChannelManager {
         return this.testOutputChannel;
     }
 
-    getTerminal(): vscode.Terminal {
-        if (!this.terminal || this.terminal.exitStatus !== undefined) {
-            this.terminal = vscode.window.createTerminal({
-                name: 'AutoTest Output',
-                iconPath: new vscode.ThemeIcon('terminal')
-            });
-        }
-        return this.terminal;
-    }
-
-    showTerminal(): void {
-        this.getTerminal().show();
-    }
-
     dispose(): void {
         if (this.logChannel) {
             this.logChannel.dispose();
@@ -56,10 +41,6 @@ export class OutputChannelManager {
         if (this.testOutputChannel) {
             this.testOutputChannel.dispose();
             this.testOutputChannel = null;
-        }
-        if (this.terminal) {
-            this.terminal.dispose();
-            this.terminal = null;
         }
     }
 }
