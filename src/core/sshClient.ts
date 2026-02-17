@@ -5,7 +5,8 @@ import { getConfig } from '../config';
 import { ServerConfig, CommandConfig } from '../types';
 import { 
     filterCommandOutput, 
-    stripAnsiEscapeCodes
+    stripAnsiEscapeCodes,
+    matchPattern
 } from '../utils/outputFilter';
 
 type LogOutputChannel = vscode.LogOutputChannel;
@@ -25,6 +26,20 @@ function getLogLevel(line: string): 'info' | 'warn' | 'error' | 'trace' {
         return 'trace';
     }
     return 'info';
+}
+
+function shouldExcludeLine(line: string, excludePatterns: string[]): boolean {
+    if (!excludePatterns || excludePatterns.length === 0) {
+        return false;
+    }
+    return excludePatterns.some(pattern => matchPattern(line, pattern));
+}
+
+function shouldIncludeLine(line: string, includePatterns: string[]): boolean {
+    if (!includePatterns || includePatterns.length === 0) {
+        return true;
+    }
+    return includePatterns.some(pattern => matchPattern(line, pattern));
 }
 
 export class SSHClient {
@@ -187,6 +202,13 @@ export async function executeRemoteCommand(
                         const lines = cleanText.split('\n');
                         for (const line of lines) {
                             if (line.trim()) {
+                                if (shouldExcludeLine(line, excludePatterns)) {
+                                    continue;
+                                }
+                                if (!shouldIncludeLine(line, includePatterns)) {
+                                    continue;
+                                }
+                                
                                 const level = getLogLevel(line);
                                 const prefix = '│ ';
                                 switch (level) {
@@ -216,6 +238,12 @@ export async function executeRemoteCommand(
                         const lines = cleanText.split('\n');
                         for (const line of lines) {
                             if (line.trim()) {
+                                if (shouldExcludeLine(line, excludePatterns)) {
+                                    continue;
+                                }
+                                if (!shouldIncludeLine(line, includePatterns)) {
+                                    continue;
+                                }
                                 outputChannel.error('│ ' + line);
                             }
                         }
