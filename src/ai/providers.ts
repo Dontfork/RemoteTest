@@ -37,14 +37,10 @@ export class AIProviderImpl implements AIProvider {
         this.globalProxy = globalProxy;
     }
 
-    private getProxy(): string | undefined {
-        return this.config.proxy || this.globalProxy;
-    }
-
     async send(messages: AIMessage[]): Promise<AIResponse> {
         const apiUrl = this.config.apiUrl || getDefaultApiUrl(this.config.name);
         const isQwen = isQwenModel(this.config.name);
-        const proxy = this.getProxy();
+        const proxy = this.globalProxy;
 
         try {
             const headers: Record<string, string> = {
@@ -118,7 +114,7 @@ export class AIProviderImpl implements AIProvider {
     private async tryStream(messages: AIMessage[], onChunk: (chunk: string) => void): Promise<AIResponse> {
         const apiUrl = this.config.apiUrl || getDefaultApiUrl(this.config.name);
         const isQwen = isQwenModel(this.config.name);
-        const proxy = this.getProxy();
+        const proxy = this.globalProxy;
 
         const headers: Record<string, string> = {
             'Content-Type': 'application/json',

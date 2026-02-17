@@ -30,7 +30,7 @@ const VALID_LOG_DIRECTORY_KEYS = ['name', 'path'];
 
 const VALID_AI_KEYS = ['models', 'defaultModel', 'proxy'];
 
-const VALID_MODEL_KEYS = ['name', 'apiKey', 'apiUrl', 'proxy'];
+const VALID_MODEL_KEYS = ['name', 'apiKey', 'apiUrl'];
 
 const REQUIRED_PROJECT_FIELDS = [
     { path: 'name', field: 'name', defaultValue: '未命名工程' },
@@ -311,19 +311,12 @@ export function validateConfig(config: any): ConfigValidationResult {
                 if (model.apiUrl && !isValidUrl(model.apiUrl)) {
                     warnings.push(`AI 模型 "${model.name || i + 1}" 的 apiUrl "${model.apiUrl}" 不是有效的 URL`);
                 }
-
-                if (model.proxy && typeof model.proxy === 'string') {
-                    const proxyParts = model.proxy.split(':');
-                    if (proxyParts.length !== 2 || isNaN(parseInt(proxyParts[1], 10))) {
-                        warnings.push(`AI 模型 "${model.name || i + 1}" 的 proxy "${model.proxy}" 格式不正确，应为 "host:port"`);
-                    }
-                }
             }
 
             if (config.ai.proxy && typeof config.ai.proxy === 'string') {
                 const proxyParts = config.ai.proxy.split(':');
                 if (proxyParts.length !== 2 || isNaN(parseInt(proxyParts[1], 10))) {
-                    warnings.push(`AI 全局 proxy "${config.ai.proxy}" 格式不正确，应为 "host:port"`);
+                    warnings.push(`AI proxy "${config.ai.proxy}" 格式不正确，应为 "host:port"`);
                 }
             }
 

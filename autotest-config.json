@@ -92,11 +92,6 @@
       {
         "name": "local-llm",
         "apiUrl": "http://localhost:8000/v1/chat/completions"
-      },
-      {
-        "name": "internal-gpt",
-        "apiUrl": "http://internal.company.com/v1/chat/completions",
-        "proxy": "proxy.company.com:8080"
       }
     ],
     "defaultModel": "qwen-turbo",

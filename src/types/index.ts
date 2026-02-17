@@ -35,7 +35,6 @@ export interface AIModelConfig {
     name: string;
     apiKey?: string;
     apiUrl?: string;
-    proxy?: string;
 }
 
 export interface AIConfig {

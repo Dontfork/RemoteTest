@@ -754,7 +754,6 @@ interface AIModelConfig {
     name: string;               // 模型名称（用于识别 API 格式）
     apiKey?: string;            // API 密钥（可选，自部署模型可能不需要）
     apiUrl?: string;            // 自定义 API 地址（可选）
-    proxy?: string;             // 模型级代理（host:port，优先于全局代理）
 }
 ```
 
@@ -765,8 +764,7 @@ interface AIModelConfig {
   - 其他模型：使用自定义 `apiUrl`，采用 OpenAI 兼容格式
 
 **代理配置**：
-- 支持全局代理和模型级代理
-- 模型级代理优先于全局代理
+- 支持全局代理
 - 代理格式：`host:port`（如 `proxy.company.com:8080`）
 - 适用于需要通过代理访问外网的内网环境
 
@@ -778,7 +776,7 @@ interface AIModelConfig {
 1. 在配置文件的 `ai.models` 数组中添加模型配置
 2. 如果是 QWen 或 OpenAI 兼容模型，系统会自动识别
 3. 如果是自定义模型，需要配置 `apiUrl` 参数
-4. 如需代理，配置 `proxy` 参数（模型级或全局）
+4. 如需代理，配置全局 `proxy` 参数
 
 ### 9.2 Markdown 渲染
 

@@ -1,45 +1,54 @@
-# AI 对话模块 (AI Chat Module)
+# AI 模块设计文档
 
 ## 1. 模块概述
 
-AI 对话模块提供与 AI 大模型进行对话交互的能力，支持多个 AI 提供商（QWen、OpenAI），可配置模型名称，维护对话历史，为用户提供智能问答和辅助功能。
+AI 模块提供与 AI 大模型进行对话交互的能力，支持多个 AI 提供商（QWen、OpenAI 及兼容模型），采用模型列表配置方式，支持自部署模型和代理配置，维护对话历史，为用户提供智能问答和辅助功能。
 
-## 2. 设计方案
+## 2. 架构设计
 
-### 2.1 架构设计
+### 2.1 整体架构
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      AI Chat Module                          │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │                     AIChat                          │    │
-│  │  ┌──────────────┐  ┌──────────────┐                │    │
-│  │  │ messages[]   │  │  provider    │                │    │
-│  │  │ (消息历史)    │  │  (提供商实例) │                │    │
-│  │  └──────────────┘  └──────────────┘                │    │
-│  └─────────────────────────────────────────────────────┘    │
-│                          │                                   │
-│                          ▼                                   │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │                AIProvider Interface                  │    │
-│  │  ┌──────────────────┐  ┌──────────────────┐         │    │
-│  │  │   QWenProvider   │  │   OpenAIProvider  │         │    │
-│  │  │  (通义千问实现)   │  │   (OpenAI实现)    │         │    │
-│  │  └──────────────────┘  └──────────────────┘         │    │
-│  └─────────────────────────────────────────────────────┘    │
-│                          │                                   │
-│                          ▼                                   │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │                    AI APIs                           │    │
-│  │  ┌──────────────────┐  ┌──────────────────┐         │    │
-│  │  │ QWen API (阿里云) │  │ OpenAI API       │         │    │
-│  │  │ dashscope        │  │ api.openai.com   │         │    │
-│  │  └──────────────────┘  └──────────────────┘         │    │
-│  └─────────────────────────────────────────────────────┘    │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           AI Module Architecture                          │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                           │
+│  ┌───────────────────────────────────────────────────────────────────┐   │
+│  │                        AIChatViewProvider                          │   │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐   │   │
+│  │  │ ModelSelect │  │  ChatPanel  │  │    MessageList          │   │   │
+│  │  │  (模型选择)  │  │  (对话面板)  │  │    (消息列表)            │   │   │
+│  │  └─────────────┘  └─────────────┘  └─────────────────────────┘   │   │
+│  └───────────────────────────────────────────────────────────────────┘   │
+│                                    │                                      │
+│                                    ▼                                      │
+│  ┌───────────────────────────────────────────────────────────────────┐   │
+│  │                           AIChat                                   │   │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐    │   │
+│  │  │ sessions[]   │  │  provider    │  │  sessionManager      │    │   │
+│  │  │ (会话历史)    │  │  (提供商实例) │  │  (会话管理器)         │    │   │
+│  │  └──────────────┘  └──────────────┘  └──────────────────────┘    │   │
+│  └───────────────────────────────────────────────────────────────────┘   │
+│                                    │                                      │
+│                                    ▼                                      │
+│  ┌───────────────────────────────────────────────────────────────────┐   │
+│  │                      AIProvider (Strategy Pattern)                 │   │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐   │   │
+│  │  │ QWenProvider│  │OpenAIProvider│  │   Custom Providers      │   │   │
+│  │  │ (通义千问)   │  │ (OpenAI兼容) │  │   (自部署模型)           │   │   │
+│  │  └─────────────┘  └─────────────┘  └─────────────────────────┘   │   │
+│  └───────────────────────────────────────────────────────────────────┘   │
+│                                    │                                      │
+│                                    ▼                                      │
+│  ┌───────────────────────────────────────────────────────────────────┐   │
+│  │                           AI APIs                                  │   │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐   │   │
+│  │  │ QWen API    │  │ OpenAI API  │  │   Self-hosted APIs      │   │   │
+│  │  │ (阿里云)     │  │ (官方/兼容)  │  │   (Ollama/LocalAI等)    │   │   │
+│  │  └─────────────┘  └─────────────┘  └─────────────────────────┘   │   │
+│  └───────────────────────────────────────────────────────────────────┘   │
+│                                                                           │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### 2.2 对话流程
@@ -53,21 +62,25 @@ AIChatViewProvider (Webview)
     ├── postMessage 发送到扩展
     │
     ▼
-AIChat.sendMessage(userMessage)
+AIChat.sendMessageStream(userMessage, callback)
     │
-    ├── 验证 API Key 配置
+    ├── 验证模型配置
     │
-    ├── 添加用户消息到历史
+    ├── 添加用户消息到会话
     │
     ├── 调用 provider.send(messages)
     │   │
     │   ├── 构建请求体 (包含 model)
     │   │
-    │   ├── 发送 HTTP 请求
+    │   ├── 应用代理配置（如有）
     │   │
-    │   └── 解析响应
+    │   ├── 发送 HTTP 请求（流式）
+    │   │
+    │   └── 解析流式响应
     │
-    ├── 添加 AI 响应到历史
+    ├── 流式回调更新 UI
+    │
+    ├── 添加 AI 响应到会话
     │
     ▼
 返回响应到 Webview 显示
@@ -80,12 +93,18 @@ AIChat.sendMessage(userMessage)
 ```
          AIProvider (Interface)
                 │
-        ┌───────┴───────┐
-        │               │
-  QWenProvider    OpenAIProvider
-        │               │
-   QWen API        OpenAI API
+        ┌───────┼───────┐
+        │       │       │
+  QWenProvider  │  CustomProvider
+        │       │       │
+   QWen API  OpenAI API  Self-hosted
 ```
+
+**模型自动识别**：
+- 系统根据模型名称自动选择对应的 API 格式
+- QWen 模型：名称包含 `qwen`（如 qwen-turbo、qwen-plus、qwen-max）
+- OpenAI 模型：名称包含 `gpt`（如 gpt-3.5-turbo、gpt-4、gpt-4o）
+- 其他模型：使用自定义 `apiUrl`，采用 OpenAI 兼容格式
 
 ## 3. 类型定义
 
@@ -120,6 +139,7 @@ interface AIResponse {
 ```typescript
 interface AIProvider {
     send(messages: AIMessage[]): Promise<AIResponse>;
+    sendStream(messages: AIMessage[], onChunk: (chunk: string) => void): Promise<AIResponse>;
 }
 ```
 
@@ -127,21 +147,27 @@ interface AIProvider {
 
 ```typescript
 interface AIConfig {
-    provider: 'qwen' | 'openai';  // 当前使用的提供商
-    qwen: QWenConfig;             // QWen 配置
-    openai: OpenAIConfig;         // OpenAI 配置
+    models: AIModelConfig[];    // 模型列表
+    defaultModel?: string;      // 默认模型名称
+    proxy?: string;             // 全局代理（host:port）
 }
 
-interface QWenConfig {
-    apiKey: string;               // API 密钥
-    apiUrl: string;               // API 地址
-    model: string;                // 模型名称
+interface AIModelConfig {
+    name: string;               // 模型名称（用于识别 API 格式）
+    apiKey?: string;            // API 密钥（可选，自部署模型可能不需要）
+    apiUrl?: string;            // 自定义 API 地址（可选）
 }
+```
 
-interface OpenAIConfig {
-    apiKey: string;               // API 密钥
-    apiUrl: string;               // API 地址
-    model: string;                // 模型名称
+### 3.5 会话接口
+
+```typescript
+interface ChatSession {
+    id: string;
+    title: string;
+    messages: AIMessage[];
+    createdAt: number;
+    updatedAt: number;
 }
 ```
 
@@ -149,226 +175,154 @@ interface OpenAIConfig {
 
 ### 4.1 AIChat 类
 
-AIChat 是 AI 对话模块的核心类，负责管理对话历史和调用 AI 提供商。
+AIChat 是 AI 对话模块的核心类，负责管理会话和调用 AI 提供商。
 
 ```typescript
 export class AIChat {
-    private messages: AIMessage[] = [];
-    private provider: AIProvider;
+    private provider: AIProvider | null = null;
+    private sessionManager: SessionManager;
+    private currentModelName: string | null = null;
 
-    constructor() {
-        const config = getConfig();
-        const aiConfig = config.ai;
-
-        // 根据配置选择提供商
-        if (aiConfig.provider === 'qwen') {
-            this.provider = new QWenProvider(aiConfig.qwen);
-        } else {
-            this.provider = new OpenAIProvider(aiConfig.openai);
-        }
+    constructor(sessionManager: SessionManager) {
+        this.sessionManager = sessionManager;
+        this.initProvider();
     }
 
-    // 切换提供商
-    setProvider(provider: 'qwen' | 'openai'): void;
+    // 模型管理
+    setModel(modelName: string): boolean;
+    getCurrentModel(): string | null;
+    getAvailableModels(): AIModelConfig[];
 
-    // 消息管理
-    addMessage(role: 'user' | 'assistant' | 'system', content: string): void;
-    clearMessages(): void;
-    getMessages(): AIMessage[];
+    // 会话管理
+    getCurrentSession(): ChatSession | null;
+    setCurrentSession(sessionId: string): ChatSession | null;
+    getAllSessions(): ChatSession[];
+    createNewSession(): ChatSession;
+    deleteSession(sessionId: string): boolean;
+    clearCurrentSession(): ChatSession | null;
 
-    // 发送消息
+    // 消息发送
     async sendMessage(userMessage: string): Promise<AIResponse>;
+    async sendMessageStream(userMessage: string, onChunk: (chunk: string) => void): Promise<AIResponse>;
 }
 ```
 
-#### 构造函数
+### 4.2 AIProviderImpl 类
+
+统一的 AI 提供商实现，支持 QWen 和 OpenAI 兼容 API。
 
 ```typescript
-constructor() {
-    const config = getConfig();
-    const aiConfig = config.ai;
+export class AIProviderImpl implements AIProvider {
+    private config: AIModelConfig;
+    private globalProxy?: string;
 
-    if (aiConfig.provider === 'qwen') {
-        this.provider = new QWenProvider(aiConfig.qwen);
-    } else {
-        this.provider = new OpenAIProvider(aiConfig.openai);
-    }
-}
-```
-
-#### setProvider(provider: 'qwen' | 'openai'): void
-
-切换 AI 提供商。
-
-```typescript
-setProvider(provider: 'qwen' | 'openai'): void {
-    const config = getConfig();
-    const aiConfig = config.ai;
-
-    if (provider === 'qwen') {
-        this.provider = new QWenProvider(aiConfig.qwen);
-    } else {
-        this.provider = new OpenAIProvider(aiConfig.openai);
-    }
-}
-```
-
-#### addMessage(role, content): void
-
-添加消息到历史记录。
-
-```typescript
-addMessage(role: 'user' | 'assistant' | 'system', content: string): void {
-    this.messages.push({ role, content });
-}
-```
-
-#### clearMessages(): void
-
-清空对话历史。
-
-```typescript
-clearMessages(): void {
-    this.messages = [];
-}
-```
-
-#### getMessages(): AIMessage[]
-
-获取当前对话历史（返回副本）。
-
-```typescript
-getMessages(): AIMessage[] {
-    return [...this.messages];
-}
-```
-
-#### sendMessage(userMessage: string): Promise<AIResponse>
-
-发送用户消息并获取 AI 响应。
-
-```typescript
-async sendMessage(userMessage: string): Promise<AIResponse> {
-    const config = getConfig();
-    
-    // 1. 验证配置
-    if (!config.ai) {
-        return { content: '', error: '请先配置 AI 服务' };
-    }
-
-    if (config.ai.provider === 'qwen' && !config.ai.qwen?.apiKey) {
-        return { content: '', error: '请配置 QWen API Key' };
-    }
-
-    if (config.ai.provider === 'openai' && !config.ai.openai?.apiKey) {
-        return { content: '', error: '请配置 OpenAI API Key' };
-    }
-
-    // 2. 添加用户消息
-    this.addMessage('user', userMessage);
-
-    // 3. 调用 AI 提供商
-    const response = await this.provider.send(this.messages);
-
-    // 4. 添加 AI 响应（仅当成功时）
-    if (response.content && !response.error) {
-        this.addMessage('assistant', response.content);
-    }
-
-    return response;
-}
-```
-
-### 4.2 QWenProvider 类
-
-通义千问 API 实现。
-
-```typescript
-export class QWenProvider implements AIProvider {
-    private config: QWenConfig;
-
-    constructor(config: QWenConfig) {
+    constructor(config: AIModelConfig, globalProxy?: string) {
         this.config = config;
+        this.globalProxy = globalProxy;
     }
 
-    async send(messages: AIMessage[]): Promise<AIResponse> {
-        const apiUrl = this.config.apiUrl || 
-            'https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation';
-        const model = this.config.model || 'qwen-turbo';
-
-        try {
-            const response = await axios.post(apiUrl, {
-                model: model,
-                input: { 
-                    messages: messages.map(m => ({ 
-                        role: m.role, 
-                        content: m.content 
-                    })) 
-                },
-                parameters: { result_format: 'message' }
-            }, {
-                headers: {
-                    'Authorization': `Bearer ${this.config.apiKey}`,
-                    'Content-Type': 'application/json'
-                },
-                timeout: 60000
-            });
-
-            const content = response.data?.output?.choices?.[0]?.message?.content || '';
-            return { content: content || 'AI 未返回有效响应' };
-        } catch (error: any) {
-            const errorMsg = error.response?.data?.message || error.message || '请求失败';
-            return { content: '', error: errorMsg };
-        }
+    private getProxy(): string | undefined {
+        return this.config.proxy || this.globalProxy;
     }
+
+    async send(messages: AIMessage[]): Promise<AIResponse>;
+    async sendStream(messages: AIMessage[], onChunk: (chunk: string) => void): Promise<AIResponse>;
 }
 ```
 
-### 4.3 OpenAIProvider 类
+### 4.3 SessionManager 类
 
-OpenAI API 实现。
+会话管理器，负责会话的持久化存储和管理。
 
 ```typescript
-export class OpenAIProvider implements AIProvider {
-    private config: OpenAIConfig;
+export class SessionManager {
+    private sessions: Map<string, ChatSession> = new Map();
+    private currentSessionId: string | null = null;
+    private storageKey: string = 'autotest.ai.sessions';
 
-    constructor(config: OpenAIConfig) {
-        this.config = config;
-    }
-
-    async send(messages: AIMessage[]): Promise<AIResponse> {
-        const apiUrl = this.config.apiUrl || 
-            'https://api.openai.com/v1/chat/completions';
-        const model = this.config.model || 'gpt-3.5-turbo';
-
-        try {
-            const response = await axios.post(apiUrl, {
-                model: model,
-                messages: messages.map(m => ({ 
-                    role: m.role, 
-                    content: m.content 
-                }))
-            }, {
-                headers: {
-                    'Authorization': `Bearer ${this.config.apiKey}`,
-                    'Content-Type': 'application/json'
-                },
-                timeout: 60000
-            });
-
-            const content = response.data?.choices?.[0]?.message?.content || '';
-            return { content: content || 'AI 未返回有效响应' };
-        } catch (error: any) {
-            const errorMsg = error.response?.data?.message || error.message || '请求失败';
-            return { content: '', error: errorMsg };
-        }
-    }
+    getCurrentSession(): ChatSession | null;
+    setCurrentSession(sessionId: string): ChatSession | null;
+    getAllSessions(): ChatSession[];
+    createSession(): ChatSession;
+    deleteSession(sessionId: string): boolean;
+    clearSession(sessionId: string): ChatSession | null;
+    updateSession(sessionId: string, updates: Partial<ChatSession>): void;
 }
 ```
 
-## 5. 支持的模型
+## 5. 配置说明
 
-### 5.1 QWen 模型
+### 5.1 基本配置
+
+```json
+{
+  "ai": {
+    "models": [
+      {
+        "name": "qwen-turbo",
+        "apiKey": "your-qwen-api-key"
+      },
+      {
+        "name": "gpt-4",
+        "apiKey": "your-openai-api-key",
+        "apiUrl": "https://api.openai.com/v1/chat/completions"
+      }
+    ],
+    "defaultModel": "qwen-turbo"
+  }
+}
+```
+
+### 5.2 自部署模型配置
+
+对于自部署的模型（如 Ollama、LocalAI），可以不配置 `apiKey`：
+
+```json
+{
+  "ai": {
+    "models": [
+      {
+        "name": "local-llm",
+        "apiUrl": "http://localhost:8000/v1/chat/completions"
+      }
+    ],
+    "defaultModel": "local-llm"
+  }
+}
+```
+
+### 5.3 代理配置
+
+支持全局代理，适用于需要通过代理访问外网的内网环境：
+
+```json
+{
+  "ai": {
+    "models": [
+      {
+        "name": "gpt-4",
+        "apiKey": "your-api-key"
+      }
+    ],
+    "proxy": "proxy.company.com:8080"
+  }
+}
+```
+
+### 5.4 配置字段说明
+
+| 字段 | 必填 | 说明 |
+|------|------|------|
+| `models` | 是 | 模型配置列表 |
+| `models[].name` | 是 | 模型名称，系统根据名称自动识别 API 格式 |
+| `models[].apiKey` | 否 | API 密钥，自部署模型可能不需要 |
+| `models[].apiUrl` | 否 | 自定义 API 地址 |
+| `defaultModel` | 否 | 默认使用的模型名称，默认使用第一个模型 |
+| `proxy` | 否 | 全局代理，格式 `host:port` |
+
+## 6. 支持的模型
+
+### 6.1 QWen 模型
 
 | 模型名称 | 说明 | 适用场景 |
 |----------|------|----------|
@@ -377,31 +331,30 @@ export class OpenAIProvider implements AIProvider {
 | qwen-max | 最强模型 | 高质量输出、复杂推理 |
 | qwen-max-longcontext | 长上下文模型 | 长文档处理 |
 
-### 5.2 OpenAI 模型
+### 6.2 OpenAI 模型
 
 | 模型名称 | 说明 | 适用场景 |
 |----------|------|----------|
 | gpt-3.5-turbo | 快速响应模型 | 日常对话、快速问答 |
-| gpt-3.5-turbo-16k | 长上下文模型 | 中等长度文档 |
 | gpt-4 | 高级模型 | 复杂推理、代码生成 |
-| gpt-4-32k | 超长上下文模型 | 长文档处理 |
 | gpt-4-turbo | 最新模型 | 最新功能支持 |
+| gpt-4o | 多模态模型 | 图文理解 |
 
-### 5.3 模型选择逻辑
+### 6.3 自部署模型
 
-```typescript
-// 优先使用配置中的模型
-const model = this.config.model || 'qwen-turbo';  // QWen 默认
-const model = this.config.model || 'gpt-3.5-turbo';  // OpenAI 默认
-```
+支持任何 OpenAI 兼容的 API，包括：
+- Ollama
+- LocalAI
+- vLLM
+- 其他兼容服务
 
-## 6. API 接口规范
+## 7. API 接口规范
 
-### 6.1 QWen API
+### 7.1 QWen API
 
 **请求地址**：
 ```
-POST https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation
+POST https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
 ```
 
 **请求头**：
@@ -414,34 +367,14 @@ Content-Type: application/json
 ```json
 {
     "model": "qwen-turbo",
-    "input": {
-        "messages": [
-            { "role": "user", "content": "你好" }
-        ]
-    },
-    "parameters": {
-        "result_format": "message"
-    }
+    "messages": [
+        { "role": "user", "content": "你好" }
+    ],
+    "stream": true
 }
 ```
 
-**响应体**：
-```json
-{
-    "output": {
-        "choices": [
-            {
-                "message": {
-                    "role": "assistant",
-                    "content": "你好！有什么我可以帮助你的吗？"
-                }
-            }
-        ]
-    }
-}
-```
-
-### 6.2 OpenAI API
+### 7.2 OpenAI API
 
 **请求地址**：
 ```
@@ -457,209 +390,113 @@ Content-Type: application/json
 **请求体**：
 ```json
 {
-    "model": "gpt-3.5-turbo",
+    "model": "gpt-4",
     "messages": [
         { "role": "user", "content": "你好" }
-    ]
+    ],
+    "stream": true
 }
-```
-
-**响应体**：
-```json
-{
-    "choices": [
-        {
-            "message": {
-                "role": "assistant",
-                "content": "你好！有什么我可以帮助你的吗？"
-            }
-        }
-    ]
-}
-```
-
-## 7. 使用示例
-
-### 7.1 基本使用
-
-```typescript
-import { AIChat } from './ai/chat';
-
-const chat = new AIChat();
-
-// 发送消息
-const response = await chat.sendMessage('什么是 TypeScript？');
-if (response.error) {
-    console.error('Error:', response.error);
-} else {
-    console.log('AI:', response.content);
-}
-```
-
-### 7.2 多轮对话
-
-```typescript
-const chat = new AIChat();
-
-// 第一轮
-await chat.sendMessage('我想学习 TypeScript');
-
-// 第二轮（AI 会记住上下文）
-await chat.sendMessage('从哪里开始？');
-
-// 获取完整对话历史
-const messages = chat.getMessages();
-console.log('对话历史:', messages);
-```
-
-### 7.3 清空对话
-
-```typescript
-const chat = new AIChat();
-
-// 开始新对话
-await chat.sendMessage('你好');
-
-// 清空历史，开始新话题
-chat.clearMessages();
-
-// 这是新的对话
-await chat.sendMessage('请介绍一下自己');
-```
-
-### 7.4 切换提供商
-
-```typescript
-const chat = new AIChat();
-
-// 使用 QWen
-await chat.sendMessage('你好');
-
-// 切换到 OpenAI
-chat.setProvider('openai');
-chat.clearMessages();  // 建议清空历史
-
-await chat.sendMessage('你好');
-```
-
-### 7.5 添加系统消息
-
-```typescript
-const chat = new AIChat();
-
-// 设置 AI 角色
-chat.addMessage('system', '你是一个专业的 TypeScript 开发者，擅长解答编程问题。');
-
-// 用户提问
-await chat.sendMessage('如何定义接口？');
 ```
 
 ## 8. Webview 集成
 
 AI 对话模块通过 Webview 在 VSCode 活动栏中显示。
 
-### 8.1 消息通信
+### 8.1 界面布局
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  ┌──────────────┐  ┌────────────────────────────────────┐  │
+│  │  模型选择     │  │           工具栏                   │  │
+│  │  [下拉框]    │  │   [新对话] [历史]                  │  │
+│  └──────────────┘  └────────────────────────────────────┘  │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │              对话区域                                │   │
+│  │  ┌──────────────────────────────────────────────┐  │   │
+│  │  │ 用户: 帮我分析测试结果                         │  │   │
+│  │  └──────────────────────────────────────────────┘  │   │
+│  │                                                      │   │
+│  │  ┌──────────────────────────────────────────────┐  │   │
+│  │  │ AI: 好的，我来分析...                         │  │   │
+│  │  └──────────────────────────────────────────────┘  │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│  [输入消息...                                    ] [发送]   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 8.2 消息通信
 
 ```typescript
 // Webview 发送消息到扩展
 webview.postMessage({
-    type: 'sendMessage',
-    message: userInput
+    command: 'sendMessage',
+    data: userInput
 });
 
 // 扩展处理消息
 webview.onDidReceiveMessage(async (message) => {
-    if (message.type === 'sendMessage') {
-        const response = await chat.sendMessage(message.message);
-        webview.postMessage({
-            type: 'response',
-            content: response.content,
-            error: response.error
-        });
+    switch (message.command) {
+        case 'sendMessage':
+            await handleSendMessage(message.data);
+            break;
+        case 'switchModel':
+            aiChat.setModel(message.modelName);
+            break;
+        case 'getModels':
+            sendAvailableModels();
+            break;
+        // ... 其他命令
     }
 });
 ```
 
-### 8.2 UI 组件
-
-- 消息列表区域：显示对话历史
-- 输入框：用户输入消息
-- 发送按钮：提交消息
-
 ### 8.3 Markdown 渲染
 
-AI 回复支持 Markdown 语法渲染，包括：
+AI 回复支持 Markdown 语法渲染，使用 `marked` 库：
 
 | 语法 | 渲染效果 |
 |------|----------|
 | `**粗体**` | **粗体** |
 | `*斜体*` | *斜体* |
 | `` `代码` `` | `代码` |
-| ` ```代码块``` ` | 代码块（带语法高亮） |
+| ` ```代码块``` ` | 代码块 |
 | `# 标题` | H1-H4 标题 |
 | `- 列表项` | 无序列表 |
 | `> 引用` | 引用块 |
 | `[链接](url)` | 超链接 |
-| `---` | 分隔线 |
-
-**渲染实现**：
-- 使用自定义 `renderMarkdown()` 函数解析 Markdown
-- 支持 VSCode 主题变量，自动适配深色/浅色主题
-- 代码块使用等宽字体和背景色区分
-- 用户消息不渲染 Markdown，仅显示原始文本
 
 ## 9. 错误处理
 
 | 错误场景 | 处理方式 |
 |----------|----------|
 | 未配置 AI 服务 | 返回错误提示 |
-| API Key 未配置 | 返回具体提示 |
+| API Key 未配置（需要时） | 返回具体提示 |
 | API 请求超时 | 60 秒超时，返回错误 |
 | API 返回错误 | 解析错误信息并返回 |
 | 网络错误 | 捕获异常并返回错误信息 |
+| 流式请求失败 | 回退到非流式请求 |
 
 ## 10. 扩展性设计
 
-### 10.1 添加新提供商
+### 10.1 添加新模型
 
-1. 创建新的 Provider 类实现 `AIProvider` 接口：
+只需在配置文件中添加模型配置，系统会自动识别：
 
-```typescript
-export class NewAIProvider implements AIProvider {
-    private config: NewAIConfig;
-
-    constructor(config: NewAIConfig) {
-        this.config = config;
-    }
-
-    async send(messages: AIMessage[]): Promise<AIResponse> {
-        // 实现调用逻辑
-    }
-}
-```
-
-2. 在类型定义中添加配置接口：
-
-```typescript
-interface NewAIConfig {
-    apiKey: string;
-    apiUrl: string;
-    model: string;
-}
-
-interface AIConfig {
-    provider: 'qwen' | 'openai' | 'newai';
-    qwen: QWenConfig;
-    openai: OpenAIConfig;
-    newai: NewAIConfig;  // 新增
-}
-```
-
-3. 在 AIChat 中添加路由：
-
-```typescript
-if (aiConfig.provider === 'newai') {
-    this.provider = new NewAIProvider(aiConfig.newai);
+```json
+{
+  "ai": {
+    "models": [
+      {
+        "name": "new-model",
+        "apiKey": "your-api-key",
+        "apiUrl": "https://api.example.com/v1/chat/completions"
+      }
+    ]
+  }
 }
 ```
 
@@ -671,25 +508,51 @@ if (aiConfig.provider === 'newai') {
 - 可扩展工具调用接口
 - 支持多轮对话
 
+**Agent 模式设计（规划中）**：
+
+```
+┌───────────────────────────────────────────────────────────────────┐
+│                      ToolRegistry (Agent Mode)                     │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐   │
+│  │ FileTool    │  │ CommandTool │  │   LogTool               │   │
+│  │ (文件操作)   │  │ (命令执行)   │  │   (日志分析)             │   │
+│  └─────────────┘  └─────────────┘  └─────────────────────────┘   │
+└───────────────────────────────────────────────────────────────────┘
+```
+
+**可用工具（规划中）**：
+
+| 工具名称 | 描述 | 参数 |
+|----------|------|------|
+| readFile | 读取文件内容 | path: string |
+| writeFile | 写入文件内容 | path: string, content: string |
+| executeCommand | 执行命令 | command: string |
+| analyzeLog | 分析日志文件 | logPath: string, pattern: string |
+| uploadFile | 上传文件到服务器 | localPath: string |
+| downloadLog | 下载日志文件 | remotePath: string |
+
 ## 11. 性能考虑
 
 - API 请求设置 60 秒超时
-- 消息历史存储在内存中
-- 支持清空历史释放内存
+- 会话存储使用 VSCode 全局状态
+- 支持流式响应，提升用户体验
 - 使用异步请求不阻塞 UI
+- 代理配置支持网络隔离环境
 
 ## 12. 测试覆盖
 
-AI 对话模块测试覆盖以下场景：
+AI 模块测试覆盖以下场景：
 
-- 消息管理测试
+- 模型配置验证测试
 - QWen 提供商测试
 - OpenAI 提供商测试
-- 响应处理测试
-- 提供商选择测试
-- API 配置测试
-- 请求配置测试
+- 流式响应测试
+- 会话管理测试
 - 错误处理测试
-- 对话上下文测试
+- 代理配置测试
+- 自部署模型测试
 
-详见测试文件：`test/suite/ai.test.ts`
+详见测试文件：
+- `test/suite/ai.test.ts`
+- `test/suite/aiChatView.test.ts`
+- `test/suite/configValidator.test.ts`
