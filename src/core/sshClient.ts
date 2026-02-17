@@ -132,7 +132,8 @@ export async function executeRemoteCommand(
     command: string,
     outputChannel?: LogOutputChannel,
     serverConfig?: ServerConfig,
-    commandConfig?: Partial<CommandConfig>
+    commandConfig?: Partial<CommandConfig>,
+    clearOutput?: boolean
 ): Promise<ExecuteResult> {
     const sshClient = new SSHClient(serverConfig);
     
@@ -159,6 +160,9 @@ export async function executeRemoteCommand(
                 : command;
             
             if (outputChannel) {
+                if (clearOutput) {
+                    outputChannel.clear();
+                }
                 outputChannel.info('');
                 outputChannel.info(`┌─ 执行命令 ${'─'.repeat(48)}`);
                 outputChannel.info(`│ ${finalServerConfig.username}@${finalServerConfig.host}:${finalServerConfig.port}`);

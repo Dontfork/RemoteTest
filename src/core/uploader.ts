@@ -232,6 +232,9 @@ export class FileUploader {
         
         this.testOutputChannel.info(`[${project.name}] ${finalCommand}`);
         
+        const config = getConfig();
+        const clearOutput = config.clearOutputBeforeRun ?? false;
+        
         const result = await executeRemoteCommand(
             finalCommand, 
             this.testOutputChannel,
@@ -240,7 +243,8 @@ export class FileUploader {
                 includePatterns: command.includePatterns || [],
                 excludePatterns: command.excludePatterns || [],
                 colorRules: command.colorRules
-            }
+            },
+            clearOutput
         );
         
         if (result.code !== 0) {

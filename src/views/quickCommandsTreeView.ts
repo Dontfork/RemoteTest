@@ -3,6 +3,7 @@ import { QuickCommandDetector } from '../core/quickCommandDetector';
 import { QuickCommand, QuickCommandGroup } from '../types';
 import { executeRemoteCommand } from '../core/sshClient';
 import { getOutputChannelManager } from '../utils/outputChannel';
+import { getConfig } from '../config';
 
 export class QuickCommandItem extends vscode.TreeItem {
     public quickCommand: QuickCommand | null;
@@ -114,6 +115,8 @@ export class QuickCommandsTreeView {
 
         const cmd = item.quickCommand;
         const project = cmd.project;
+        const config = getConfig();
+        const clearOutput = config.clearOutputBeforeRun ?? false;
 
         try {
             await vscode.window.withProgress({
@@ -124,7 +127,9 @@ export class QuickCommandsTreeView {
                 await executeRemoteCommand(
                     cmd.executeCommand,
                     this.testOutputChannel,
-                    project.server
+                    project.server,
+                    undefined,
+                    clearOutput
                 );
             });
 
