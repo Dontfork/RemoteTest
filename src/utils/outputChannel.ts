@@ -9,8 +9,7 @@ export class OutputChannelManager {
     private static instance: OutputChannelManager;
     private logChannel: vscode.LogOutputChannel | null = null;
     private testOutputChannel: vscode.LogOutputChannel | null = null;
-    private 
-    : vscode.Terminal | null = null;
+    private terminal: vscode.Terminal | null = null;
 
     private constructor() {}
 

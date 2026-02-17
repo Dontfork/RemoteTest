@@ -132,7 +132,7 @@ export async function executeRemoteCommand(
     commandConfig?: Partial<CommandConfig>
 ): Promise<ExecuteResult> {
     const config = getConfig();
-    const outputMode = config.outputMode || 'channel';
+    const outputMode = (config.outputMode || 'channel').toLowerCase();
     
     if (outputMode === 'terminal') {
         return executeInTerminal(command, outputChannel, serverConfig, commandConfig);
