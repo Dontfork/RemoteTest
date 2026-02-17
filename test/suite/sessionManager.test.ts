@@ -590,3 +590,63 @@ describe('SessionManager Workspace Storage - 工作区存储测试', () => {
         assert.ok(source.includes('chat-sessions'));
     });
 });
+
+describe('SessionManager System Prompt - 系统提示词持久化测试', () => {
+    it('应有getSystemPrompt方法', () => {
+        const sourcePath = path.join(__dirname, '..', '..', '..', 'src', 'ai', 'sessionManager.ts');
+        const source = fs.readFileSync(sourcePath, 'utf-8');
+        assert.ok(source.includes('getSystemPrompt'));
+    });
+
+    it('应有saveSystemPrompt方法', () => {
+        const sourcePath = path.join(__dirname, '..', '..', '..', 'src', 'ai', 'sessionManager.ts');
+        const source = fs.readFileSync(sourcePath, 'utf-8');
+        assert.ok(source.includes('saveSystemPrompt'));
+    });
+
+    it('系统提示词应存储在.autotest目录下', () => {
+        const sourcePath = path.join(__dirname, '..', '..', '..', 'src', 'ai', 'sessionManager.ts');
+        const source = fs.readFileSync(sourcePath, 'utf-8');
+        assert.ok(source.includes('system-prompt.json'));
+    });
+});
+
+describe('AIChatView System Prompt - 系统提示词UI测试', () => {
+    it('应处理saveSystemPrompt命令', () => {
+        const sourcePath = path.join(__dirname, '..', '..', '..', 'src', 'views', 'aiChatView.ts');
+        const source = fs.readFileSync(sourcePath, 'utf-8');
+        assert.ok(source.includes("case 'saveSystemPrompt'"));
+    });
+
+    it('应处理getSystemPrompt命令', () => {
+        const sourcePath = path.join(__dirname, '..', '..', '..', 'src', 'views', 'aiChatView.ts');
+        const source = fs.readFileSync(sourcePath, 'utf-8');
+        assert.ok(source.includes("case 'getSystemPrompt'"));
+    });
+
+    it('应有sendSystemPrompt方法', () => {
+        const sourcePath = path.join(__dirname, '..', '..', '..', 'src', 'views', 'aiChatView.ts');
+        const source = fs.readFileSync(sourcePath, 'utf-8');
+        assert.ok(source.includes('sendSystemPrompt'));
+    });
+
+    it('前端应监听systemPrompt消息', () => {
+        const sourcePath = path.join(__dirname, '..', '..', '..', 'src', 'views', 'aiChatView.ts');
+        const source = fs.readFileSync(sourcePath, 'utf-8');
+        assert.ok(source.includes("m.command === 'systemPrompt'"));
+    });
+
+    it('输入框变化时应保存系统提示词', () => {
+        const sourcePath = path.join(__dirname, '..', '..', '..', 'src', 'views', 'aiChatView.ts');
+        const source = fs.readFileSync(sourcePath, 'utf-8');
+        assert.ok(source.includes('promptInput.oninput'));
+        assert.ok(source.includes("command: 'saveSystemPrompt'"));
+    });
+
+    it('清空按钮应保存空提示词', () => {
+        const sourcePath = path.join(__dirname, '..', '..', '..', 'src', 'views', 'aiChatView.ts');
+        const source = fs.readFileSync(sourcePath, 'utf-8');
+        assert.ok(source.includes('clearPromptBtn.onclick'));
+        assert.ok(source.includes("prompt: ''"));
+    });
+});

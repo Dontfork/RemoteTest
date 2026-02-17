@@ -190,6 +190,29 @@ export class SessionManager {
         return session;
     }
 
+    getSystemPrompt(): string {
+        try {
+            const filePath = path.join(this.storagePath, '..', 'system-prompt.json');
+            if (fs.existsSync(filePath)) {
+                const content = fs.readFileSync(filePath, 'utf-8');
+                const data = JSON.parse(content);
+                return data.prompt || '';
+            }
+        } catch {
+            // ignore
+        }
+        return '';
+    }
+
+    saveSystemPrompt(prompt: string): void {
+        try {
+            const filePath = path.join(this.storagePath, '..', 'system-prompt.json');
+            fs.writeFileSync(filePath, JSON.stringify({ prompt }, null, 2), 'utf-8');
+        } catch {
+            // ignore
+        }
+    }
+
     private generateId(): string {
         return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
     }

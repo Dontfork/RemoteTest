@@ -78,11 +78,27 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
                 case 'importPrompt':
                     this.handleImportPrompt();
                     break;
+                case 'saveSystemPrompt':
+                    this.sessionManager.saveSystemPrompt(message.prompt);
+                    break;
+                case 'getSystemPrompt':
+                    this.sendSystemPrompt();
+                    break;
             }
         });
 
         this.sessionManager.onSessionsChange(() => {
             this.sendSessions();
+        });
+        
+        this.sendSystemPrompt();
+    }
+
+    private sendSystemPrompt(): void {
+        const prompt = this.sessionManager.getSystemPrompt();
+        this.view?.webview.postMessage({
+            command: 'systemPrompt',
+            data: prompt
         });
     }
 
@@ -505,6 +521,7 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         clearPromptBtn.onclick = function() {
             promptInput.value = '';
             systemPrompt = '';
+            vscode.postMessage({ command: 'saveSystemPrompt', prompt: '' });
         };
         
         togglePromptBtn.onclick = function() {
@@ -569,11 +586,20 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
             } else if (m.command === 'promptContent') {
                 promptInput.value = m.data;
                 systemPrompt = m.data;
+            } else if (m.command === 'systemPrompt') {
+                promptInput.value = m.data || '';
+                systemPrompt = m.data || '';
             }
         };
         
         vscode.postMessage({ command: 'getSessions' });
         vscode.postMessage({ command: 'getModels' });
+        vscode.postMessage({ command: 'getSystemPrompt' });
+        
+        promptInput.oninput = function() {
+            systemPrompt = promptInput.value.trim();
+            vscode.postMessage({ command: 'saveSystemPrompt', prompt: systemPrompt });
+        };
     </script>
 </body>
 </html>`;
