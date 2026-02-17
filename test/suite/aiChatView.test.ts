@@ -135,6 +135,37 @@ describe('AIChatView WebView Template - WebView模板测试', () => {
         const template = getTemplate();
         assert.ok(template.includes('deleteSession'));
     });
+
+    it('模板应包含模型选择下拉框', () => {
+        const template = getTemplate();
+        assert.ok(template.includes('id="modelSelect"'));
+        assert.ok(template.includes('model-select'));
+    });
+
+    it('应处理models消息', () => {
+        const template = getTemplate();
+        assert.ok(template.includes("if (m.command === 'models')"));
+    });
+
+    it('应处理currentModel消息', () => {
+        const template = getTemplate();
+        assert.ok(template.includes("if (m.command === 'currentModel')"));
+    });
+
+    it('应包含renderModels函数', () => {
+        const template = getTemplate();
+        assert.ok(template.includes('function renderModels'));
+    });
+
+    it('模型选择下拉框应有change事件', () => {
+        const template = getTemplate();
+        assert.ok(template.includes('modelSelect.onchange'));
+    });
+
+    it('应支持切换模型', () => {
+        const template = getTemplate();
+        assert.ok(template.includes('switchModel'));
+    });
 });
 
 describe('AIChatView Markdown Rendering - Markdown渲染测试', () => {

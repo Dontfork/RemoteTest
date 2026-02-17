@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { marked } from 'marked';
 import { AIChat } from '../ai';
 import { SessionManager } from '../ai/sessionManager';
-import { ChatSession } from '../types';
+import { ChatSession, AIModelConfig } from '../types';
 
 export class AIChatViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'autotest-ai-view';
@@ -61,6 +61,13 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
                     this.sendSessions();
                     this.sendCurrentSession();
                     break;
+                case 'switchModel':
+                    this.aiChat.setModel(message.modelName);
+                    this.sendCurrentModel();
+                    break;
+                case 'getModels':
+                    this.sendAvailableModels();
+                    break;
             }
         });
 
@@ -92,6 +99,26 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
                 title: session.title,
                 messages: session.messages
             } : null
+        });
+    }
+
+    private sendAvailableModels(): void {
+        const models = this.aiChat.getAvailableModels();
+        const currentModel = this.aiChat.getCurrentModel();
+        this.view?.webview.postMessage({
+            command: 'models',
+            data: {
+                models: models.map(m => ({ name: m.name })),
+                currentModel: currentModel
+            }
+        });
+    }
+
+    private sendCurrentModel(): void {
+        const currentModel = this.aiChat.getCurrentModel();
+        this.view?.webview.postMessage({
+            command: 'currentModel',
+            data: currentModel
         });
     }
 
@@ -141,10 +168,15 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1e1e1e; color: #cccccc; height: 100vh; display: flex; flex-direction: column; }
-        .toolbar { padding: 4px 12px; border-bottom: 1px solid #3c3c3c; display: flex; gap: 8px; align-items: flex-start; position: relative; justify-content: flex-end; }
+        .toolbar { padding: 4px 12px; border-bottom: 1px solid #3c3c3c; display: flex; gap: 8px; align-items: center; position: relative; justify-content: space-between; }
+        .toolbar-left { display: flex; align-items: center; gap: 8px; }
+        .toolbar-right { display: flex; align-items: center; gap: 8px; }
         .toolbar button { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: transparent; color: #858585; border: none; cursor: pointer; transition: all 0.2s; }
         .toolbar button:hover { color: #cccccc; }
         .toolbar button svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 1.5; fill: none; }
+        .model-select { background: transparent; color: #cccccc; border: 1px solid #3c3c3c; padding: 4px 8px; border-radius: 4px; font-size: 12px; cursor: pointer; min-width: 100px; }
+        .model-select:hover { border-color: #858585; }
+        .model-select:focus { outline: none; border-color: #0e639c; }
         .messages { flex: 1; overflow-y: auto; padding: 16px; }
         .msg { margin-bottom: 16px; display: flex; }
         .msg.user { justify-content: flex-end; }
@@ -195,12 +227,19 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
 </head>
 <body>
     <div class="toolbar">
-        <button id="newBtn" title="新对话">
-            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-        </button>
-        <button id="historyBtn" title="历史">
-            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-        </button>
+        <div class="toolbar-left">
+            <select id="modelSelect" class="model-select" title="选择模型">
+                <option value="">加载中...</option>
+            </select>
+        </div>
+        <div class="toolbar-right">
+            <button id="newBtn" title="新对话">
+                <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+            <button id="historyBtn" title="历史">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+            </button>
+        </div>
         <div id="historyPanel" class="history-panel"></div>
     </div>
     <div id="messages" class="messages">
@@ -226,11 +265,24 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         const newBtn = document.getElementById('newBtn');
         const historyBtn = document.getElementById('historyBtn');
         const historyPanel = document.getElementById('historyPanel');
+        const modelSelect = document.getElementById('modelSelect');
         let sessions = [];
         let currentSessionId = null;
+        let availableModels = [];
+        let currentModel = null;
         
         function escapeHtml(text) {
             return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+        
+        function renderModels() {
+            if (!availableModels || availableModels.length === 0) {
+                modelSelect.innerHTML = '<option value="">无可用模型</option>';
+                return;
+            }
+            modelSelect.innerHTML = availableModels.map(m => 
+                '<option value="' + escapeHtml(m.name) + '"' + (m.name === currentModel ? ' selected' : '') + '>' + escapeHtml(m.name) + '</option>'
+            ).join('');
         }
         
         function addMessage(role, content) {
@@ -296,6 +348,13 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
             historyPanel.classList.toggle('show');
         };
         
+        modelSelect.onchange = function() {
+            const selectedModel = modelSelect.value;
+            if (selectedModel && selectedModel !== currentModel) {
+                vscode.postMessage({ command: 'switchModel', modelName: selectedModel });
+            }
+        };
+        
         historyPanel.onclick = function(e) {
             const item = e.target.closest('.history-item');
             const deleteBtn = e.target.closest('.delete-btn');
@@ -344,10 +403,18 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
                 currentSessionId = m.data ? m.data.id : null;
                 renderMessages(m.data ? m.data.messages : []);
                 renderHistory();
+            } else if (m.command === 'models') {
+                availableModels = m.data.models || [];
+                currentModel = m.data.currentModel;
+                renderModels();
+            } else if (m.command === 'currentModel') {
+                currentModel = m.data;
+                renderModels();
             }
         };
         
         vscode.postMessage({ command: 'getSessions' });
+        vscode.postMessage({ command: 'getModels' });
     </script>
 </body>
 </html>`;
