@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { getConfig } from '../config';
-import { executeRemoteCommand } from './sshClient';
+import { executeRemoteCommand, isExecuting } from './sshClient';
 import { CommandConfig, CommandVariables } from '../types';
 import { getOutputChannelManager } from '../utils/outputChannel';
 
@@ -30,6 +30,11 @@ export class CommandExecutor {
     }
 
     async execute(command: string, commandConfig?: Partial<CommandConfig>): Promise<string> {
+        if (isExecuting()) {
+            vscode.window.showWarningMessage('当前有命令正在执行中，请等待执行完成后再试');
+            return '';
+        }
+        
         const config = getConfig();
         const clearOutput = config.clearOutputBeforeRun ?? false;
         

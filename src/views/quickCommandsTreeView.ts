@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { QuickCommandDetector } from '../core/quickCommandDetector';
 import { QuickCommand, QuickCommandGroup } from '../types';
-import { executeRemoteCommand } from '../core/sshClient';
+import { executeRemoteCommand, isExecuting } from '../core/sshClient';
 import { getOutputChannelManager } from '../utils/outputChannel';
 import { getConfig } from '../config';
 
@@ -110,6 +110,11 @@ export class QuickCommandsTreeView {
     async executeQuickCommand(item: QuickCommandItem): Promise<void> {
         if (!item.quickCommand) {
             vscode.window.showWarningMessage('请选择一个命令');
+            return;
+        }
+
+        if (isExecuting()) {
+            vscode.window.showWarningMessage('当前有命令正在执行中，请等待执行完成后再试');
             return;
         }
 

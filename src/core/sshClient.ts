@@ -11,6 +11,12 @@ import {
 
 type LogOutputChannel = vscode.LogOutputChannel;
 
+let isCommandExecuting = false;
+
+export function isExecuting(): boolean {
+    return isCommandExecuting;
+}
+
 function getLogLevel(line: string): 'info' | 'warn' | 'error' | 'trace' {
     const lowerLine = line.toLowerCase();
     if (lowerLine.includes('[error]') || lowerLine.includes('[err]') || 
@@ -135,6 +141,11 @@ export async function executeRemoteCommand(
     commandConfig?: Partial<CommandConfig>,
     clearOutput?: boolean
 ): Promise<ExecuteResult> {
+    if (isCommandExecuting) {
+        throw new Error('当前有命令正在执行中，请等待执行完成后再试');
+    }
+    
+    isCommandExecuting = true;
     const sshClient = new SSHClient(serverConfig);
     
     try {
@@ -173,12 +184,14 @@ export async function executeRemoteCommand(
 
             client.exec(fullCommand, (err, stream) => {
                 if (err) {
+                    isCommandExecuting = false;
                     reject(new Error(`命令执行失败: ${err.message}`));
                     return;
                 }
 
                 stream.on('close', (code: number, signal: string) => {
                     exitCode = code;
+                    isCommandExecuting = false;
                     
                     if (outputChannel) {
                         if (code === 0) {
@@ -256,6 +269,7 @@ export async function executeRemoteCommand(
             });
         });
     } catch (error) {
+        isCommandExecuting = false;
         await sshClient.disconnect();
         throw error;
     }

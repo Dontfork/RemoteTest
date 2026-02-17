@@ -4,7 +4,7 @@ import * as path from 'path';
 import { getConfig, matchProject, hasValidLocalPath, hasValidRemoteDirectory } from '../config';
 import { SCPClient } from './scpClient';
 import { CommandExecutor, replaceCommandVariables, buildCommandVariables } from './commandExecutor';
-import { executeRemoteCommand } from './sshClient';
+import { executeRemoteCommand, isExecuting } from './sshClient';
 import { ProjectConfig, CommandConfig } from '../types';
 
 export class FileUploader {
@@ -213,6 +213,11 @@ export class FileUploader {
         project: ProjectConfig, 
         command: CommandConfig
     ): Promise<void> {
+        if (isExecuting()) {
+            vscode.window.showWarningMessage('当前有命令正在执行中，请等待执行完成后再试');
+            return;
+        }
+
         const remoteFilePath = this.calculateRemotePath(localFilePath, project);
 
         const scpClient = new SCPClient(project.server);
