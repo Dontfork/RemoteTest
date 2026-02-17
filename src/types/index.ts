@@ -67,6 +67,7 @@ export interface AutoTestConfig {
     ai: AIConfig;
     refreshInterval?: number;
     textFileExtensions?: string[];
+    outputMode?: 'terminal' | 'channel';
 }
 
 export interface LegacyServerConfig {

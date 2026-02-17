@@ -7,8 +7,20 @@ import {
     filterCommandOutput, 
     stripAnsiEscapeCodes
 } from '../utils/outputFilter';
+import { getOutputChannelManager } from '../utils/outputChannel';
 
 type LogOutputChannel = vscode.LogOutputChannel;
+
+const ANSI = {
+    reset: '\x1b[0m',
+    red: '\x1b[31m',
+    green: '\x1b[32m',
+    yellow: '\x1b[33m',
+    blue: '\x1b[34m',
+    cyan: '\x1b[36m',
+    white: '\x1b[37m',
+    bold: '\x1b[1m'
+};
 
 function getLogLevel(line: string): 'info' | 'warn' | 'error' | 'trace' {
     const lowerLine = line.toLowerCase();
@@ -116,6 +128,128 @@ export interface ExecuteResult {
 export async function executeRemoteCommand(
     command: string,
     outputChannel?: LogOutputChannel,
+    serverConfig?: ServerConfig,
+    commandConfig?: Partial<CommandConfig>
+): Promise<ExecuteResult> {
+    const config = getConfig();
+    const outputMode = config.outputMode || 'channel';
+    
+    if (outputMode === 'terminal') {
+        return executeInTerminal(command, outputChannel, serverConfig, commandConfig);
+    }
+    
+    return executeWithChannel(command, outputChannel, serverConfig, commandConfig);
+}
+
+async function executeInTerminal(
+    command: string,
+    outputChannel: LogOutputChannel | undefined,
+    serverConfig?: ServerConfig,
+    commandConfig?: Partial<CommandConfig>
+): Promise<ExecuteResult> {
+    const sshClient = new SSHClient(serverConfig);
+    
+    try {
+        const client = await sshClient.connect();
+        const finalServerConfig = serverConfig || (() => {
+            const config = getConfig();
+            if (config.projects && config.projects.length > 0 && config.projects[0].enabled !== false) {
+                return config.projects[0].server;
+            }
+            throw new Error('未配置服务器信息');
+        })();
+
+        const channelManager = getOutputChannelManager();
+        const terminal = channelManager.getTerminal();
+        terminal.show();
+
+        const includePatterns = commandConfig?.includePatterns || [];
+        const excludePatterns = commandConfig?.excludePatterns || [];
+
+        return new Promise((resolve, reject) => {
+            let stdout = '';
+            let stderr = '';
+            let exitCode = 0;
+
+            const fullCommand = finalServerConfig.remoteDirectory 
+                ? `cd ${finalServerConfig.remoteDirectory} && ${command}`
+                : command;
+            
+            terminal.sendText(`${ANSI.cyan}┌─ 执行命令 ${'─'.repeat(48)}${ANSI.reset}`);
+            terminal.sendText(`${ANSI.cyan}│ ${ANSI.green}${finalServerConfig.username}@${finalServerConfig.host}:${finalServerConfig.port}${ANSI.reset}`);
+            terminal.sendText(`${ANSI.cyan}│ ${ANSI.yellow}${fullCommand}${ANSI.reset}`);
+            terminal.sendText(`${ANSI.cyan}├─ 输出 ${'─'.repeat(52)}${ANSI.reset}`);
+
+            client.exec(fullCommand, (err, stream) => {
+                if (err) {
+                    terminal.sendText(`${ANSI.red}└─ 命令执行失败: ${err.message}${ANSI.reset}`);
+                    reject(new Error(`命令执行失败: ${err.message}`));
+                    return;
+                }
+
+                stream.on('close', (code: number, signal: string) => {
+                    exitCode = code;
+                    
+                    if (code === 0) {
+                        terminal.sendText(`${ANSI.green}└─ 完成 (退出码: ${code}) ${'─'.repeat(42)}${ANSI.reset}`);
+                    } else {
+                        terminal.sendText(`${ANSI.red}└─ 完成 (退出码: ${code}) ${'─'.repeat(42)}${ANSI.reset}`);
+                    }
+                    
+                    const combinedOutput = stdout + stderr;
+                    const cleanOutput = stripAnsiEscapeCodes(combinedOutput);
+                    const filteredOutput = filterCommandOutput(cleanOutput, includePatterns, excludePatterns);
+                    
+                    resolve({ stdout, stderr, code: exitCode, filteredOutput });
+                    sshClient.disconnect();
+                });
+
+                stream.on('data', (data: Buffer) => {
+                    const text = data.toString();
+                    stdout += text;
+                    
+                    const cleanText = stripAnsiEscapeCodes(text);
+                    const lines = cleanText.split('\n');
+                    for (const line of lines) {
+                        if (line.trim()) {
+                            const level = getLogLevel(line);
+                            switch (level) {
+                                case 'error':
+                                    terminal.sendText(`${ANSI.red}│ ${line}${ANSI.reset}`);
+                                    break;
+                                case 'warn':
+                                    terminal.sendText(`${ANSI.yellow}│ ${line}${ANSI.reset}`);
+                                    break;
+                                default:
+                                    terminal.sendText(`${ANSI.white}│ ${line}${ANSI.reset}`);
+                            }
+                        }
+                    }
+                });
+
+                stream.stderr.on('data', (data: Buffer) => {
+                    const text = data.toString();
+                    stderr += text;
+                    
+                    const cleanText = stripAnsiEscapeCodes(text);
+                    const lines = cleanText.split('\n');
+                    for (const line of lines) {
+                        if (line.trim()) {
+                            terminal.sendText(`${ANSI.red}│ ${line}${ANSI.reset}`);
+                        }
+                    }
+                });
+            });
+        });
+    } catch (error) {
+        await sshClient.disconnect();
+        throw error;
+    }
+}
+
+async function executeWithChannel(
+    command: string,
+    outputChannel: LogOutputChannel | undefined,
     serverConfig?: ServerConfig,
     commandConfig?: Partial<CommandConfig>
 ): Promise<ExecuteResult> {
