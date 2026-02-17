@@ -16,7 +16,7 @@ export interface MissingField {
     defaultValue: any;
 }
 
-const VALID_ROOT_KEYS = ['projects', 'ai', 'refreshInterval', 'textFileExtensions', 'outputMode'];
+const VALID_ROOT_KEYS = ['projects', 'ai', 'refreshInterval', 'textFileExtensions'];
 
 const VALID_PROJECT_KEYS = ['name', 'localPath', 'enabled', 'server', 'commands', 'logs'];
 
@@ -159,14 +159,6 @@ export function validateConfig(config: any): ConfigValidationResult {
                     warnings.push(`textFileExtensions[${i}] 建议以点号开头，例如 ".${ext}"`);
                 }
             }
-        }
-    }
-
-    if (config.outputMode !== undefined) {
-        const validModes = ['channel', 'webview'];
-        const mode = String(config.outputMode).toLowerCase();
-        if (!validModes.includes(mode)) {
-            warnings.push(`outputMode "${config.outputMode}" 不是有效值，应为 "channel" 或 "webview"，将使用默认值 "channel"`);
         }
     }
 

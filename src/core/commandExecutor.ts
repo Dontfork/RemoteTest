@@ -30,16 +30,12 @@ export class CommandExecutor {
     }
 
     async execute(command: string, commandConfig?: Partial<CommandConfig>): Promise<string> {
-        const config = getConfig();
-        const outputMode = config.outputMode || 'channel';
-        
         try {
             const result = await executeRemoteCommand(
                 command, 
                 this.testOutputChannel,
                 undefined,
-                commandConfig,
-                outputMode
+                commandConfig
             );
             return result.filteredOutput;
         } catch (error: any) {

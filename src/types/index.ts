@@ -67,7 +67,6 @@ export interface AutoTestConfig {
     ai: AIConfig;
     refreshInterval?: number;
     textFileExtensions?: string[];
-    outputMode?: 'channel' | 'webview';
 }
 
 export interface LegacyServerConfig {
