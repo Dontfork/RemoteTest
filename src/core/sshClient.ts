@@ -5,8 +5,6 @@ import { getConfig } from '../config';
 import { ServerConfig, CommandConfig } from '../types';
 import { 
     filterCommandOutput, 
-    applyColorRules, 
-    getColorRules,
     stripAnsiEscapeCodes
 } from '../utils/outputFilter';
 
@@ -109,7 +107,6 @@ export async function executeRemoteCommand(
 
         const includePatterns = commandConfig?.includePatterns || [];
         const excludePatterns = commandConfig?.excludePatterns || [];
-        const colorRules = getColorRules(commandConfig?.colorRules);
 
         return new Promise((resolve, reject) => {
             let stdout = '';
@@ -146,8 +143,7 @@ export async function executeRemoteCommand(
                         const lines = filteredOutput.split('\n');
                         for (const line of lines) {
                             if (line.trim()) {
-                                const coloredLine = applyColorRules(line, colorRules);
-                                outputChannel.appendLine(`│ ${coloredLine}`);
+                                outputChannel.appendLine(`│ ${line}`);
                             }
                         }
                         
