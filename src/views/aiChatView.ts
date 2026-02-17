@@ -3,6 +3,7 @@ import { marked } from 'marked';
 import { AIChat } from '../ai';
 import { SessionManager } from '../ai/sessionManager';
 import { ChatSession, AIModelConfig } from '../types';
+import { onConfigChanged } from '../config';
 
 export class AIChatViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'autotest-ai-view';
@@ -15,6 +16,12 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         this.extensionUri = extensionUri;
         this.aiChat = aiChat;
         this.sessionManager = sessionManager;
+        
+        onConfigChanged(() => {
+            if (this.view) {
+                this.sendAvailableModels();
+            }
+        });
     }
 
     resolveWebviewView(
@@ -174,10 +181,11 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         .toolbar button { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: transparent; color: #858585; border: none; cursor: pointer; transition: all 0.2s; }
         .toolbar button:hover { color: #cccccc; }
         .toolbar button svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 1.5; fill: none; }
-        .model-select { background: transparent; color: #858585; border: none; border-bottom: 1px solid #3c3c3c; padding: 2px 0; font-size: 12px; cursor: pointer; min-width: 80px; }
+        .model-select { background: transparent; color: #858585; border: none; border-bottom: 1px solid #3c3c3c; padding: 2px 0; font-size: 12px; cursor: pointer; min-width: 80px; appearance: none; -webkit-appearance: none; }
         .model-select:hover { color: #cccccc; border-bottom-color: #858585; }
         .model-select:focus { outline: none; border-bottom-color: #858585; }
-        .model-select option { background: #1e1e1e; color: #cccccc; }
+        .model-select option { background: #1e1e1e; color: #cccccc; padding: 4px 8px; }
+        .model-select option:checked, .model-select option:hover { background: #2d2d2d; color: #cccccc; }
         .messages { flex: 1; overflow-y: auto; padding: 16px; }
         .msg { margin-bottom: 16px; display: flex; }
         .msg.user { justify-content: flex-end; }
