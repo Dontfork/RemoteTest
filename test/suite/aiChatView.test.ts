@@ -225,7 +225,7 @@ describe('AIChatView Session Management - 会话管理测试', () => {
 
     it('应有sendCurrentSession方法', () => {
         const source = getSourceFile();
-        assert.ok(source.includes('private sendCurrentSession'));
+        assert.ok(source.includes('sendCurrentSession'));
     });
 
     it('新建会话应检查当前会话是否为空', () => {
@@ -290,5 +290,44 @@ describe('AIChatView System Prompt - 系统提示词测试', () => {
     it('handleSendMessage应接收systemPrompt参数', () => {
         const source = getSourceFile();
         assert.ok(source.includes('data: { message: string; systemPrompt?: string }'));
+    });
+});
+
+describe('AIChatView Markdown Rendering - Markdown渲染增强测试', () => {
+    it('sendCurrentSession应为async方法', () => {
+        const source = getSourceFile();
+        assert.ok(source.includes('async sendCurrentSession'));
+    });
+
+    it('sendCurrentSession应渲染assistant消息', () => {
+        const source = getSourceFile();
+        assert.ok(source.includes('renderedContent'));
+        assert.ok(source.includes('await marked'));
+    });
+
+    it('应有addCopyButtons函数', () => {
+        const template = getTemplate();
+        assert.ok(template.includes('function addCopyButtons'));
+    });
+
+    it('代码块应有复制按钮样式', () => {
+        const template = getTemplate();
+        assert.ok(template.includes('.copy-btn'));
+        assert.ok(template.includes('.code-block-wrapper'));
+    });
+
+    it('复制按钮应使用clipboard API', () => {
+        const template = getTemplate();
+        assert.ok(template.includes('navigator.clipboard.writeText'));
+    });
+
+    it('renderMessages应使用renderedContent', () => {
+        const template = getTemplate();
+        assert.ok(template.includes('m.renderedContent'));
+    });
+
+    it('代码块背景色应不同于页面背景', () => {
+        const template = getTemplate();
+        assert.ok(template.includes('.bubble pre { background: #252526'));
     });
 });

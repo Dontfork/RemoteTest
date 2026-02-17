@@ -100,15 +100,32 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         });
     }
 
-    private sendCurrentSession(): void {
+    private async sendCurrentSession(): Promise<void> {
         const session = this.aiChat.getCurrentSession();
+        if (!session) {
+            this.view?.webview.postMessage({
+                command: 'currentSession',
+                data: null
+            });
+            return;
+        }
+
+        const renderedMessages = await Promise.all(
+            session.messages.map(async (m) => {
+                if (m.role === 'assistant') {
+                    return { ...m, renderedContent: await marked(m.content) };
+                }
+                return m;
+            })
+        );
+
         this.view?.webview.postMessage({
             command: 'currentSession',
-            data: session ? {
+            data: {
                 id: session.id,
                 title: session.title,
-                messages: session.messages
-            } : null
+                messages: renderedMessages
+            }
         });
     }
 
@@ -221,9 +238,15 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         .user .bubble { background: transparent; border: 1px solid #3c3c3c; }
         .assistant .bubble { background: transparent; border: 1px solid #3c3c3c; }
         .error .bubble { background: transparent; border: 1px solid #5a1d1d; color: #f48771; }
-        .bubble pre { background: #1e1e1e; padding: 12px 16px; border-radius: 8px; overflow-x: auto; margin: 10px 0; }
-        .bubble code { background: #1e1e1e; padding: 2px 6px; border-radius: 4px; font-family: 'Consolas', 'Monaco', monospace; font-size: 0.9em; }
+        .bubble pre { background: #252526; padding: 12px 16px; border-radius: 4px; overflow-x: auto; margin: 10px 0; border: 1px solid #3c3c3c; }
+        .bubble code { background: #252526; padding: 2px 6px; border-radius: 4px; font-family: 'Consolas', 'Monaco', monospace; font-size: 0.9em; }
         .bubble pre code { background: none; padding: 0; }
+        .code-block-wrapper { position: relative; margin: 10px 0; }
+        .code-block-wrapper pre { margin: 0; }
+        .copy-btn { position: absolute; top: 8px; right: 8px; background: transparent; color: #858585; border: 1px solid #3c3c3c; border-radius: 4px; padding: 4px; cursor: pointer; opacity: 0; transition: opacity 0.2s, color 0.2s; }
+        .code-block-wrapper:hover .copy-btn { opacity: 1; }
+        .copy-btn:hover { color: #cccccc; border-color: #858585; }
+        .copy-btn svg { width: 14px; height: 14px; stroke: currentColor; stroke-width: 1.5; fill: none; }
         .bubble h1, .bubble h2, .bubble h3 { margin: 14px 0 10px 0; color: #e0e0e0; }
         .bubble h1 { font-size: 1.3em; }
         .bubble h2 { font-size: 1.15em; }
@@ -367,15 +390,46 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
             ).join('');
         }
         
-        function addMessage(role, content) {
+        function addMessage(role, content, isRendered = false) {
             const welcome = messages.querySelector('.welcome');
             if (welcome) welcome.remove();
             const div = document.createElement('div');
             div.className = 'msg ' + role;
             div.innerHTML = '<div class="bubble">' + content + '</div>';
             messages.appendChild(div);
+            addCopyButtons(div);
             messages.scrollTop = messages.scrollHeight;
             return div;
+        }
+        
+        function addCopyButtons(container) {
+            const codeBlocks = container.querySelectorAll('pre code');
+            codeBlocks.forEach((block, index) => {
+                const pre = block.parentElement;
+                if (pre && !pre.querySelector('.copy-btn')) {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'code-block-wrapper';
+                    pre.parentNode.insertBefore(wrapper, pre);
+                    wrapper.appendChild(pre);
+                    
+                    const copyBtn = document.createElement('button');
+                    copyBtn.className = 'copy-btn';
+                    copyBtn.innerHTML = '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+                    copyBtn.title = '复制代码';
+                    copyBtn.onclick = function() {
+                        const code = block.textContent || '';
+                        navigator.clipboard.writeText(code).then(() => {
+                            copyBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>';
+                            copyBtn.title = '已复制';
+                            setTimeout(() => {
+                                copyBtn.innerHTML = '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+                                copyBtn.title = '复制代码';
+                            }, 2000);
+                        });
+                    };
+                    wrapper.appendChild(copyBtn);
+                }
+            });
         }
         
         function renderMessages(msgs) {
@@ -385,7 +439,13 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
                 return;
             }
             msgs.forEach(m => {
-                addMessage(m.role, m.role === 'user' ? escapeHtml(m.content) : m.content);
+                if (m.role === 'assistant' && m.renderedContent) {
+                    addMessage(m.role, m.renderedContent, true);
+                } else if (m.role === 'assistant') {
+                    addMessage(m.role, m.content, false);
+                } else {
+                    addMessage(m.role, escapeHtml(m.content));
+                }
             });
         }
         
