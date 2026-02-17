@@ -148,6 +148,8 @@ export async function executeRemoteCommand(
                 outputChannel.info(`┌─ 执行命令 ${'─'.repeat(48)}`);
                 outputChannel.info(`│ ${finalServerConfig.username}@${finalServerConfig.host}:${finalServerConfig.port}`);
                 outputChannel.info(`│ ${fullCommand}`);
+                outputChannel.info(`├─ 输出 ${'─'.repeat(52)}`);
+                outputChannel.show();
             }
 
             client.exec(fullCommand, (err, stream) => {
@@ -159,14 +161,30 @@ export async function executeRemoteCommand(
                 stream.on('close', (code: number, signal: string) => {
                     exitCode = code;
                     
+                    if (outputChannel) {
+                        if (code === 0) {
+                            outputChannel.info(`└─ 完成 (退出码: ${code}) ${'─'.repeat(42)}`);
+                        } else {
+                            outputChannel.error(`└─ 完成 (退出码: ${code}) ${'─'.repeat(42)}`);
+                        }
+                        outputChannel.show();
+                    }
+                    
                     const combinedOutput = stdout + stderr;
                     const cleanOutput = stripAnsiEscapeCodes(combinedOutput);
                     const filteredOutput = filterCommandOutput(cleanOutput, includePatterns, excludePatterns);
                     
+                    resolve({ stdout, stderr, code: exitCode, filteredOutput });
+                    sshClient.disconnect();
+                });
+
+                stream.on('data', (data: Buffer) => {
+                    const text = data.toString();
+                    stdout += text;
+                    
                     if (outputChannel) {
-                        outputChannel.info(`├─ 输出 ${'─'.repeat(52)}`);
-                        
-                        const lines = filteredOutput.split('\n');
+                        const cleanText = stripAnsiEscapeCodes(text);
+                        const lines = cleanText.split('\n');
                         for (const line of lines) {
                             if (line.trim()) {
                                 const level = getLogLevel(line);
@@ -186,27 +204,22 @@ export async function executeRemoteCommand(
                                 }
                             }
                         }
-                        
-                        if (code === 0) {
-                            outputChannel.info(`└─ 完成 (退出码: ${code}) ${'─'.repeat(42)}`);
-                        } else {
-                            outputChannel.error(`└─ 完成 (退出码: ${code}) ${'─'.repeat(42)}`);
-                        }
-                        outputChannel.show();
                     }
-                    
-                    resolve({ stdout, stderr, code: exitCode, filteredOutput });
-                    sshClient.disconnect();
-                });
-
-                stream.on('data', (data: Buffer) => {
-                    const text = data.toString();
-                    stdout += text;
                 });
 
                 stream.stderr.on('data', (data: Buffer) => {
                     const text = data.toString();
                     stderr += text;
+                    
+                    if (outputChannel) {
+                        const cleanText = stripAnsiEscapeCodes(text);
+                        const lines = cleanText.split('\n');
+                        for (const line of lines) {
+                            if (line.trim()) {
+                                outputChannel.error('│ ' + line);
+                            }
+                        }
+                    }
                 });
             });
         });
