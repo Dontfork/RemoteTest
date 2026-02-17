@@ -563,3 +563,30 @@ describe('SessionManager - 会话管理器测试', () => {
         });
     });
 });
+
+describe('SessionManager Workspace Storage - 工作区存储测试', () => {
+    it('源码应包含getWorkspaceStoragePath方法', () => {
+        const sourcePath = path.join(__dirname, '..', '..', '..', 'src', 'ai', 'sessionManager.ts');
+        const source = fs.readFileSync(sourcePath, 'utf-8');
+        assert.ok(source.includes('getWorkspaceStoragePath'));
+    });
+
+    it('应优先使用工作区路径', () => {
+        const sourcePath = path.join(__dirname, '..', '..', '..', 'src', 'ai', 'sessionManager.ts');
+        const source = fs.readFileSync(sourcePath, 'utf-8');
+        assert.ok(source.includes('workspaceFolders'));
+        assert.ok(source.includes('.autotest'));
+    });
+
+    it('无工作区时应回退到全局存储', () => {
+        const sourcePath = path.join(__dirname, '..', '..', '..', 'src', 'ai', 'sessionManager.ts');
+        const source = fs.readFileSync(sourcePath, 'utf-8');
+        assert.ok(source.includes('globalStorageUri'));
+    });
+
+    it('存储路径应包含chat-sessions子目录', () => {
+        const sourcePath = path.join(__dirname, '..', '..', '..', 'src', 'ai', 'sessionManager.ts');
+        const source = fs.readFileSync(sourcePath, 'utf-8');
+        assert.ok(source.includes('chat-sessions'));
+    });
+});

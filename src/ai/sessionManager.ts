@@ -12,9 +12,18 @@ export class SessionManager {
     readonly onSessionsChange = this.onSessionsChangeEmitter.event;
 
     constructor(context: vscode.ExtensionContext) {
-        this.storagePath = path.join(context.globalStorageUri.fsPath, 'chat-sessions');
+        this.storagePath = this.getWorkspaceStoragePath(context);
         this.ensureStorageDir();
         this.loadSessions();
+    }
+
+    private getWorkspaceStoragePath(context: vscode.ExtensionContext): string {
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (workspaceFolders && workspaceFolders.length > 0) {
+            const workspacePath = workspaceFolders[0].uri.fsPath;
+            return path.join(workspacePath, '.autotest', 'chat-sessions');
+        }
+        return path.join(context.globalStorageUri.fsPath, 'chat-sessions');
     }
 
     private ensureStorageDir(): void {
