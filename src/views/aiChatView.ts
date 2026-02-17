@@ -273,14 +273,15 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         .prompt-collapsed #promptInput { display: none; }
         .prompt-toggle { transform: rotate(180deg); transition: transform 0.2s; }
         .prompt-collapsed .prompt-toggle { transform: rotate(0deg); }
+        .input-config { border-top: 1px solid #3c3c3c; padding: 8px 12px; background: #1e1e1e; }
+        .config-row { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+        .config-row:last-child { margin-bottom: 0; }
+        .config-label { font-size: 11px; color: #858585; min-width: 60px; }
     </style>
 </head>
 <body>
     <div class="toolbar">
         <div class="toolbar-left">
-            <select id="modelSelect" class="model-select" title="选择模型">
-                <option value="">加载中...</option>
-            </select>
         </div>
         <div class="toolbar-right">
             <button id="newBtn" title="新对话">
@@ -292,29 +293,36 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         </div>
         <div id="historyPanel" class="history-panel"></div>
     </div>
-    <div id="promptArea" class="prompt-area">
-        <div class="prompt-header">
-            <span class="prompt-label">系统提示词</span>
-            <div class="prompt-actions">
-                <button id="importPromptBtn" title="导入文件">
-                    <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
-                    导入
-                </button>
-                <button id="clearPromptBtn" title="清空">
-                    <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
-                </button>
-                <button id="togglePromptBtn" class="prompt-toggle" title="折叠">
-                    <svg viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></svg>
-                </button>
-            </div>
-        </div>
-        <textarea id="promptInput" placeholder="输入系统提示词，或点击导入按钮选择文件..."></textarea>
-    </div>
     <div id="messages" class="messages">
         <div class="welcome">
             <svg class="welcome-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-5"/></svg>
             <h2>AutoTest AI 助手</h2>
             <p>输入问题开始对话</p>
+        </div>
+    </div>
+    <div class="input-config">
+        <div class="config-row">
+            <span class="config-label">模型</span>
+            <select id="modelSelect" class="model-select" title="选择模型">
+                <option value="">加载中...</option>
+            </select>
+        </div>
+        <div id="promptArea" class="prompt-area" style="padding: 0; border: none;">
+            <div class="prompt-header" style="margin-bottom: 4px;">
+                <span class="prompt-label">提示词</span>
+                <div class="prompt-actions">
+                    <button id="importPromptBtn" title="导入文件">
+                        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+                    </button>
+                    <button id="clearPromptBtn" title="清空">
+                        <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                    </button>
+                    <button id="togglePromptBtn" class="prompt-toggle" title="折叠">
+                        <svg viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></svg>
+                    </button>
+                </div>
+            </div>
+            <textarea id="promptInput" placeholder="输入系统提示词..."></textarea>
         </div>
     </div>
     <div class="input-area">
