@@ -6,7 +6,7 @@ import { getConfig } from '../config';
 import { LogFile, ServerConfig } from '../types';
 import { ConnectionPool } from './connectionPool';
 
-const TEXT_FILE_EXTENSIONS = [
+const DEFAULT_TEXT_FILE_EXTENSIONS = [
     '.txt', '.md', '.json', '.xml', '.html', '.css', '.js', '.ts', '.jsx', '.tsx',
     '.py', '.java', '.c', '.cpp', '.h', '.hpp', '.cs', '.go', '.rs', '.rb', '.php',
     '.sh', '.bash', '.zsh', '.yml', '.yaml', '.toml', '.ini', '.conf', '.cfg',
@@ -16,18 +16,25 @@ const TEXT_FILE_EXTENSIONS = [
     '.r', '.rmd', '.csv', '.tsv', '.log', '.awk', '.sed'
 ];
 
-function isTextFile(filePath: string): boolean {
+const DEFAULT_TEXT_FILE_NAMES = [
+    '.gitignore', '.dockerignore', '.editorconfig', '.eslintrc', '.prettierrc',
+    '.babelrc', 'license', 'readme', 'changelog', 'makefile', 'dockerfile',
+    'vagrantfile', 'gemfile', 'rakefile', 'procfile'
+];
+
+function isTextFile(filePath: string, customExtensions?: string[]): boolean {
     const ext = path.extname(filePath).toLowerCase();
-    if (TEXT_FILE_EXTENSIONS.includes(ext)) {
+    
+    const allExtensions = customExtensions 
+        ? [...DEFAULT_TEXT_FILE_EXTENSIONS, ...customExtensions.map(e => e.toLowerCase())]
+        : DEFAULT_TEXT_FILE_EXTENSIONS;
+    
+    if (allExtensions.includes(ext)) {
         return true;
     }
+    
     const fileName = path.basename(filePath).toLowerCase();
-    const textFileNames = [
-        '.gitignore', '.dockerignore', '.editorconfig', '.eslintrc', '.prettierrc',
-        '.babelrc', 'license', 'readme', 'changelog', 'makefile', 'dockerfile',
-        'vagrantfile', 'gemfile', 'rakefile', 'procfile'
-    ];
-    if (textFileNames.some(name => fileName === name || fileName.startsWith(name + '.'))) {
+    if (DEFAULT_TEXT_FILE_NAMES.some(name => fileName === name || fileName.startsWith(name + '.'))) {
         return true;
     }
     return false;
@@ -109,6 +116,7 @@ export class SCPClient {
     async uploadFile(localPath: string, remotePath?: string): Promise<string> {
         const serverConfig = this.getServerConfig();
         const sftp = await this.connect();
+        const config = getConfig();
 
         const fileName = path.basename(localPath);
         
@@ -125,7 +133,7 @@ export class SCPClient {
         } catch {
         }
 
-        if (isTextFile(localPath)) {
+        if (isTextFile(localPath, config.textFileExtensions)) {
             const content = fs.readFileSync(localPath);
             const convertedContent = convertCrlfToLf(content);
             await sftp.put(convertedContent, remotePath);

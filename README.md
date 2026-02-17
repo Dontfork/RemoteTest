@@ -256,6 +256,27 @@ vsce package
 |------|------|
 | `ai` | AI 服务配置（全局） |
 | `refreshInterval` | 日志刷新间隔（毫秒），默认 0（禁用自动刷新） |
+| `textFileExtensions` | 额外的文本文件扩展名列表（可选），上传时自动转换换行符 |
+
+### 文本文件扩展名配置
+
+上传文件到 Linux 服务器时，系统会自动将文本文件的换行符从 CRLF (`\r\n`) 转换为 LF (`\n`)。默认支持的文本文件扩展名包括：
+
+```
+.txt, .md, .json, .xml, .html, .css, .js, .ts, .jsx, .tsx,
+.py, .java, .c, .cpp, .h, .hpp, .cs, .go, .rs, .rb, .php,
+.sh, .bash, .zsh, .yml, .yaml, .toml, .ini, .conf, .cfg,
+.sql, .vue, .svelte, .scss, .sass, .less, .env, .properties,
+.log, .csv, .tsv 等
+```
+
+如果需要添加额外的扩展名，可以在配置文件中添加：
+
+```json
+{
+  "textFileExtensions": [".custom", ".xyz", ".abc"]
+}
+```
 
 ### AI 配置说明
 

@@ -66,6 +66,7 @@ export interface AutoTestConfig {
     projects: ProjectConfig[];
     ai: AIConfig;
     refreshInterval?: number;
+    textFileExtensions?: string[];
 }
 
 export interface LegacyServerConfig {

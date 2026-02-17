@@ -16,7 +16,7 @@ export interface MissingField {
     defaultValue: any;
 }
 
-const VALID_ROOT_KEYS = ['projects', 'ai', 'refreshInterval'];
+const VALID_ROOT_KEYS = ['projects', 'ai', 'refreshInterval', 'textFileExtensions'];
 
 const VALID_PROJECT_KEYS = ['name', 'localPath', 'enabled', 'server', 'commands', 'logs'];
 
@@ -144,6 +144,21 @@ export function validateConfig(config: any): ConfigValidationResult {
             errors.push(`refreshInterval 不能为负数，当前值为 ${config.refreshInterval}`);
         } else if (!Number.isInteger(config.refreshInterval)) {
             warnings.push(`refreshInterval 应该是整数，当前值为 ${config.refreshInterval}`);
+        }
+    }
+
+    if (config.textFileExtensions !== undefined) {
+        if (!Array.isArray(config.textFileExtensions)) {
+            errors.push(`textFileExtensions 必须是数组类型，当前类型为 "${typeof config.textFileExtensions}"`);
+        } else {
+            for (let i = 0; i < config.textFileExtensions.length; i++) {
+                const ext = config.textFileExtensions[i];
+                if (typeof ext !== 'string') {
+                    errors.push(`textFileExtensions[${i}] 必须是字符串类型`);
+                } else if (!ext.startsWith('.')) {
+                    warnings.push(`textFileExtensions[${i}] 建议以点号开头，例如 ".${ext}"`);
+                }
+            }
         }
     }
 
