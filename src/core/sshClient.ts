@@ -8,8 +8,14 @@ import {
     stripAnsiEscapeCodes,
     matchPattern
 } from '../utils/outputFilter';
+import { WebviewOutputPanel } from '../utils/webviewOutput';
 
 type LogOutputChannel = vscode.LogOutputChannel;
+
+interface OutputTarget {
+    channel?: LogOutputChannel;
+    webview?: WebviewOutputPanel;
+}
 
 function getLogLevel(line: string): 'info' | 'warn' | 'error' | 'trace' {
     const lowerLine = line.toLowerCase();
@@ -40,6 +46,39 @@ function shouldIncludeLine(line: string, includePatterns: string[]): boolean {
         return true;
     }
     return includePatterns.some(pattern => matchPattern(line, pattern));
+}
+
+function outputLine(target: OutputTarget, text: string, level: 'info' | 'warn' | 'error' | 'trace' = 'info'): void {
+    if (target.channel) {
+        switch (level) {
+            case 'error':
+                target.channel.error(text);
+                break;
+            case 'warn':
+                target.channel.warn(text);
+                break;
+            case 'trace':
+                target.channel.trace(text);
+                break;
+            default:
+                target.channel.info(text);
+        }
+    }
+    if (target.webview) {
+        switch (level) {
+            case 'error':
+                target.webview.appendError(text);
+                break;
+            case 'warn':
+                target.webview.appendWarn(text);
+                break;
+            case 'trace':
+                target.webview.appendTrace(text);
+                break;
+            default:
+                target.webview.appendInfo(text);
+        }
+    }
 }
 
 export class SSHClient {
@@ -132,7 +171,8 @@ export async function executeRemoteCommand(
     command: string,
     outputChannel?: LogOutputChannel,
     serverConfig?: ServerConfig,
-    commandConfig?: Partial<CommandConfig>
+    commandConfig?: Partial<CommandConfig>,
+    outputMode: 'channel' | 'webview' = 'channel'
 ): Promise<ExecuteResult> {
     const sshClient = new SSHClient(serverConfig);
     
@@ -149,6 +189,15 @@ export async function executeRemoteCommand(
         const includePatterns = commandConfig?.includePatterns || [];
         const excludePatterns = commandConfig?.excludePatterns || [];
 
+        const outputTarget: OutputTarget = {};
+        if (outputMode === 'webview') {
+            const webviewPanel = WebviewOutputPanel.getInstance();
+            webviewPanel.show();
+            outputTarget.webview = webviewPanel;
+        } else if (outputChannel) {
+            outputTarget.channel = outputChannel;
+        }
+
         return new Promise((resolve, reject) => {
             let stdout = '';
             let stderr = '';
@@ -158,13 +207,14 @@ export async function executeRemoteCommand(
                 ? `cd ${finalServerConfig.remoteDirectory} && ${command}`
                 : command;
             
-            if (outputChannel) {
-                outputChannel.info('');
-                outputChannel.info(`┌─ 执行命令 ${'─'.repeat(48)}`);
-                outputChannel.info(`│ ${finalServerConfig.username}@${finalServerConfig.host}:${finalServerConfig.port}`);
-                outputChannel.info(`│ ${fullCommand}`);
-                outputChannel.info(`├─ 输出 ${'─'.repeat(52)}`);
-                outputChannel.show();
+            outputLine(outputTarget, '');
+            outputLine(outputTarget, `┌─ 执行命令 ${'─'.repeat(48)}`);
+            outputLine(outputTarget, `│ ${finalServerConfig.username}@${finalServerConfig.host}:${finalServerConfig.port}`);
+            outputLine(outputTarget, `│ ${fullCommand}`);
+            outputLine(outputTarget, `├─ 输出 ${'─'.repeat(52)}`);
+            
+            if (outputTarget.channel) {
+                outputTarget.channel.show();
             }
 
             client.exec(fullCommand, (err, stream) => {
@@ -176,13 +226,14 @@ export async function executeRemoteCommand(
                 stream.on('close', (code: number, signal: string) => {
                     exitCode = code;
                     
-                    if (outputChannel) {
-                        if (code === 0) {
-                            outputChannel.info(`└─ 完成 (退出码: ${code}) ${'─'.repeat(42)}`);
-                        } else {
-                            outputChannel.error(`└─ 完成 (退出码: ${code}) ${'─'.repeat(42)}`);
-                        }
-                        outputChannel.show();
+                    if (code === 0) {
+                        outputLine(outputTarget, `└─ 完成 (退出码: ${code}) ${'─'.repeat(42)}`, 'info');
+                    } else {
+                        outputLine(outputTarget, `└─ 完成 (退出码: ${code}) ${'─'.repeat(42)}`, 'error');
+                    }
+                    
+                    if (outputTarget.channel) {
+                        outputTarget.channel.show();
                     }
                     
                     const combinedOutput = stdout + stderr;
@@ -197,34 +248,20 @@ export async function executeRemoteCommand(
                     const text = data.toString();
                     stdout += text;
                     
-                    if (outputChannel) {
-                        const cleanText = stripAnsiEscapeCodes(text);
-                        const lines = cleanText.split('\n');
-                        for (const line of lines) {
-                            if (line.trim()) {
-                                if (shouldExcludeLine(line, excludePatterns)) {
-                                    continue;
-                                }
-                                if (!shouldIncludeLine(line, includePatterns)) {
-                                    continue;
-                                }
-                                
-                                const level = getLogLevel(line);
-                                const prefix = '│ ';
-                                switch (level) {
-                                    case 'error':
-                                        outputChannel.error(prefix + line);
-                                        break;
-                                    case 'warn':
-                                        outputChannel.warn(prefix + line);
-                                        break;
-                                    case 'trace':
-                                        outputChannel.trace(prefix + line);
-                                        break;
-                                    default:
-                                        outputChannel.info(prefix + line);
-                                }
+                    const cleanText = stripAnsiEscapeCodes(text);
+                    const lines = cleanText.split('\n');
+                    for (const line of lines) {
+                        if (line.trim()) {
+                            if (shouldExcludeLine(line, excludePatterns)) {
+                                continue;
                             }
+                            if (!shouldIncludeLine(line, includePatterns)) {
+                                continue;
+                            }
+                            
+                            const level = getLogLevel(line);
+                            const prefix = '│ ';
+                            outputLine(outputTarget, prefix + line, level);
                         }
                     }
                 });
@@ -233,19 +270,17 @@ export async function executeRemoteCommand(
                     const text = data.toString();
                     stderr += text;
                     
-                    if (outputChannel) {
-                        const cleanText = stripAnsiEscapeCodes(text);
-                        const lines = cleanText.split('\n');
-                        for (const line of lines) {
-                            if (line.trim()) {
-                                if (shouldExcludeLine(line, excludePatterns)) {
-                                    continue;
-                                }
-                                if (!shouldIncludeLine(line, includePatterns)) {
-                                    continue;
-                                }
-                                outputChannel.error('│ ' + line);
+                    const cleanText = stripAnsiEscapeCodes(text);
+                    const lines = cleanText.split('\n');
+                    for (const line of lines) {
+                        if (line.trim()) {
+                            if (shouldExcludeLine(line, excludePatterns)) {
+                                continue;
                             }
+                            if (!shouldIncludeLine(line, includePatterns)) {
+                                continue;
+                            }
+                            outputLine(outputTarget, '│ ' + line, 'error');
                         }
                     }
                 });
