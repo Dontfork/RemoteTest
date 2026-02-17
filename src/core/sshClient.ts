@@ -115,7 +115,9 @@ export async function executeRemoteCommand(
             let stderr = '';
             let exitCode = 0;
 
-            const fullCommand = `cd ${finalServerConfig.remoteDirectory} && ${command}`;
+            const fullCommand = finalServerConfig.remoteDirectory 
+                ? `cd ${finalServerConfig.remoteDirectory} && ${command}`
+                : command;
             
             if (outputChannel) {
                 outputChannel.appendLine('');

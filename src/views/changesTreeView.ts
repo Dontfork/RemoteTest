@@ -4,6 +4,7 @@ import { GitChangeDetector } from '../core/gitChangeDetector';
 import { GitChange, GitChangeGroup, GitChangeType } from '../types';
 import { FileUploader } from '../core/uploader';
 import { SCPClient } from '../core/scpClient';
+import { hasValidRemoteDirectory, hasValidLocalPath } from '../config';
 
 export class ChangeTreeItem extends vscode.TreeItem {
     public change: GitChange | null;
@@ -170,6 +171,17 @@ export class ChangesTreeView {
         }
 
         const group = item.changeGroup;
+        const project = group.project;
+        
+        if (!hasValidLocalPath(project)) {
+            vscode.window.showWarningMessage(`工程 "${project.name}" 未配置 localPath，无法进行文件上传`);
+            return;
+        }
+        
+        if (!hasValidRemoteDirectory(project)) {
+            vscode.window.showWarningMessage(`工程 "${project.name}" 未配置 remoteDirectory，无法进行文件上传`);
+            return;
+        }
         
         const uploadableChanges = group.changes.filter(c => c.type !== 'deleted');
         const deletedChanges = group.changes.filter(c => c.type === 'deleted');
@@ -323,6 +335,18 @@ export class ChangesTreeView {
     async uploadSelectedChange(item: ChangeTreeItem): Promise<void> {
         if (!item.change) {
             vscode.window.showWarningMessage('请选择一个变更文件');
+            return;
+        }
+
+        const project = item.change.project;
+        
+        if (!hasValidLocalPath(project)) {
+            vscode.window.showWarningMessage(`工程 "${project.name}" 未配置 localPath，无法进行文件上传`);
+            return;
+        }
+        
+        if (!hasValidRemoteDirectory(project)) {
+            vscode.window.showWarningMessage(`工程 "${project.name}" 未配置 remoteDirectory，无法进行文件上传`);
             return;
         }
 
