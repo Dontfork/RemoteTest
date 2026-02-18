@@ -150,7 +150,9 @@ interface ProjectConfig {
                     "colorRules": [
                         { "pattern": "ERROR|FAILED|FAIL", "color": "red" },
                         { "pattern": "PASSED|SUCCESS", "color": "green" }
-                    ]
+                    ],
+                    "runnable": true,
+                    "clearOutputBeforeRun": true
                 },
                 {
                     "name": "运行覆盖率",
@@ -206,9 +208,12 @@ interface ProjectConfig {
                 "apiUrl": "https://api.openai.com/v1/chat/completions"
             }
         ],
-        "defaultModel": "qwen-turbo"
+        "defaultModel": "qwen-turbo",
+        "proxy": "127.0.0.1:7890"
     },
-    "refreshInterval": 5000
+    "refreshInterval": 5000,
+    "textFileExtensions": [".py", ".js", ".ts", ".json"],
+    "useLogOutputChannel": true
 }
 ```
 
@@ -348,6 +353,7 @@ interface ProjectConfig {
 | excludePatterns | 排除模式数组，排除匹配这些模式的行 |
 | colorRules | 颜色规则数组，定义匹配模式和对应颜色 |
 | runnable | 命令可见性控制，仅影响"运行用例"功能，true 表示运行用例可用 |
+| clearOutputBeforeRun | 执行命令前是否清空 TestOutput 通道，默认 false |
 
 **runnable 配置说明**:
 - `runnable: true`：命令在运行用例时显示
@@ -358,6 +364,10 @@ interface ProjectConfig {
 | 未配置 | ✗ 不显示 |
 | `false` | ✗ 不显示 |
 | `true` | ✓ 显示 |
+
+**clearOutputBeforeRun 配置说明**:
+- `true`：执行命令前自动清空 TestOutput 通道的历史输出
+- `false` 或未配置：保留历史输出，新输出追加在末尾
 
 **快捷命令过滤规则**:
 - 快捷命令仅显示不包含变量的命令（无 `{xxx}` 格式的变量）
@@ -398,6 +408,16 @@ interface ProjectConfig {
 | 字段 | 说明 |
 |------|------|
 | refreshInterval | 日志自动刷新间隔（毫秒），设为 0 禁用自动刷新（默认关闭）。此配置为全局配置，与项目独立 |
+| textFileExtensions | 文本文件扩展名数组，上传时会自动将 CRLF 转换为 LF。默认包含常见文本文件扩展名 |
+| useLogOutputChannel | 输出通道类型，默认 true。true 使用 LogOutputChannel（带时间戳），false 使用普通 OutputChannel（无时间戳） |
+
+**useLogOutputChannel 配置说明**:
+- `true`（默认）：使用 LogOutputChannel，输出带时间戳前缀，支持日志级别（info/warn/error）
+- `false`：使用普通 OutputChannel，输出无时间戳前缀
+
+**textFileExtensions 配置说明**:
+- 上传文件时，匹配这些扩展名的文件会自动将 CRLF 行尾转换为 LF
+- 默认包含：`.txt`, `.py`, `.js`, `.ts`, `.json`, `.xml`, `.yaml`, `.yml`, `.md`, `.html`, `.css`, `.sh`, `.bat`, `.conf`, `.ini`, `.log`, `.java`, `.c`, `.cpp`, `.h`, `.hpp`, `.go`, `.rs`, `.rb`, `.php`, `.sql`, `.vue`, `.jsx`, `.tsx`, `.scss`, `.less`, `.sass`
 
 ### 5.8 日志刷新机制
 
@@ -821,7 +841,7 @@ d:\code\AutoTest
 │   └── extension.js
 ├── doc/                    # 文档
 │   ├── Design.md           # 本文档（总览）
-│   ├── FUNCTIONS.md        # 功能使用文档
+│   ├── USER_GUIDE.md       # 用户指南
 │   ├── config.md           # 配置模块详细文档
 │   ├── commandExecutor.md  # 命令执行模块详细文档
 │   ├── logMonitor.md       # 日志监控模块详细文档
@@ -919,7 +939,7 @@ vsce package
 
 ## 15. 相关文档
 
-- [功能使用文档](./FUNCTIONS.md)
+- [用户指南](./USER_GUIDE.md)
 - [配置模块详细文档](./config.md)
 - [命令执行模块详细文档](./commandExecutor.md)
 - [日志监控模块详细文档](./logMonitor.md)
