@@ -1036,8 +1036,8 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
             display: none; 
             position: absolute; 
             top: 100%; 
-            left: 8px; 
             right: 8px; 
+            width: 280px; 
             background: var(--vscode-widget-bg); 
             border: 1px solid var(--vscode-widget-border); 
             border-radius: 4px; 

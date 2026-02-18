@@ -66,11 +66,13 @@
       },
       {
         "command": "RemoteTest.downloadLog",
-        "title": "下载日志文件"
+        "title": "下载日志文件",
+        "icon": "$(cloud-download)"
       },
       {
         "command": "RemoteTest.openLog",
-        "title": "打开日志文件"
+        "title": "打开日志文件",
+        "icon": "$(eye)"
       },
       {
         "command": "RemoteTest.reloadConfig",
@@ -94,11 +96,13 @@
       },
       {
         "command": "RemoteTest.uploadSelectedChange",
-        "title": "上传此文件"
+        "title": "上传此文件",
+        "icon": "$(cloud-upload)"
       },
       {
         "command": "RemoteTest.openChangeFile",
-        "title": "打开文件"
+        "title": "打开文件",
+        "icon": "$(eye)"
       },
       {
         "command": "RemoteTest.refreshQuickCommands",

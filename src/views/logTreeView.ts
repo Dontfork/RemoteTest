@@ -21,7 +21,7 @@ export class LogTreeItem extends vscode.TreeItem {
             this.logFile = null;
             this.projectConfig = project;
             this.contextValue = 'logDirectory';
-            this.iconPath = new vscode.ThemeIcon('folder');
+            this.iconPath = new vscode.ThemeIcon('folder', new vscode.ThemeColor('list.foreground'));
             const projectInfo = project ? ` | 项目: ${project.name}` : '';
             this.tooltip = `路径: ${dir.path}${projectInfo}`;
             if (project) {
@@ -34,20 +34,20 @@ export class LogTreeItem extends vscode.TreeItem {
             this.directoryConfig = null;
             this.projectConfig = project;
             this.contextValue = 'logSubDirectory';
-            this.iconPath = new vscode.ThemeIcon('folder');
+            this.iconPath = new vscode.ThemeIcon('folder', new vscode.ThemeColor('list.foreground'));
             this.tooltip = `路径: ${file.path}`;
         } else {
             const file = item as LogFile;
-            super(file.name, vscode.TreeItemCollapsibleState.None);
+            const sizeStr = formatSize(file.size);
+            const dateStr = formatDate(file.modifiedTime);
+            super(`${dateStr.padEnd(11)}│${sizeStr}│ ${file.name}`, vscode.TreeItemCollapsibleState.None);
             this.logFile = file;
             this.directoryConfig = null;
             this.projectConfig = project;
-            const sizeStr = formatSize(file.size);
-            const dateStr = formatDate(file.modifiedTime);
-            this.description = `${sizeStr}  ${dateStr}`;
+            this.description = '';
             this.tooltip = `路径: ${file.path}\n大小: ${formatSize(file.size)}\n修改时间: ${formatDate(file.modifiedTime)}`;
             this.contextValue = 'logFile';
-            this.iconPath = new vscode.ThemeIcon('file-text');
+            this.iconPath = new vscode.ThemeIcon('output', new vscode.ThemeColor('list.foreground'));
             this.command = {
                 command: 'RemoteTest.downloadLog',
                 title: '下载日志',
