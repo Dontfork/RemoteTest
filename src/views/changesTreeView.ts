@@ -30,9 +30,8 @@ export class ChangeTreeItem extends vscode.TreeItem {
             this.changeGroup = null;
             this.contextValue = this.getContextValueForChange(change);
             this.iconPath = this.getIconForChangeType(change.type);
-            this.description = this.getDescriptionForChange(change);
+            this.description = '';
             this.tooltip = this.getTooltipForChange(change);
-            this.resourceUri = vscode.Uri.file(change.path);
         }
     }
 
@@ -350,34 +349,34 @@ export class ChangesTreeView {
             return;
         }
 
-        if (item.change.type === 'deleted') {
-            vscode.window.showWarningMessage('已删除的文件无法上传，请使用"上传项目所有变更"功能来同步删除远程文件');
-            return;
-        }
-
         try {
-            await this.uploadSingleChange(item.change);
-            
-            if ((item.change.type === 'renamed' || item.change.type === 'moved') && item.change.oldRelativePath) {
-                const changeTypeLabel = item.change.type === 'moved' ? '移动' : '重命名';
-                const choice = await vscode.window.showInformationMessage(
-                    `文件 ${item.change.relativePath} 上传成功。\n\n检测到这是${changeTypeLabel}操作，原文件 ${item.change.oldRelativePath} 在服务器上可能还存在。是否删除远程的旧文件？`,
-                    '删除旧文件',
-                    '暂不处理'
-                );
-                
-                if (choice === '删除旧文件') {
-                    const oldChange: GitChange = {
-                        ...item.change,
-                        relativePath: item.change.oldRelativePath,
-                        path: item.change.oldPath!,
-                        type: 'deleted'
-                    };
-                    await this.deleteRemoteFile(oldChange);
-                    vscode.window.showInformationMessage(`已删除远程旧文件: ${item.change.oldRelativePath}`);
-                }
+            if (item.change.type === 'deleted') {
+                await this.deleteRemoteFile(item.change);
+                vscode.window.showInformationMessage(`已删除远程文件: ${item.change.relativePath}`);
             } else {
-                vscode.window.showInformationMessage(`文件 ${item.change.relativePath} 上传成功`);
+                await this.uploadSingleChange(item.change);
+                
+                if ((item.change.type === 'renamed' || item.change.type === 'moved') && item.change.oldRelativePath) {
+                    const changeTypeLabel = item.change.type === 'moved' ? '移动' : '重命名';
+                    const choice = await vscode.window.showInformationMessage(
+                        `文件 ${item.change.relativePath} 上传成功。\n\n检测到这是${changeTypeLabel}操作，原文件 ${item.change.oldRelativePath} 在服务器上可能还存在。是否删除远程的旧文件？`,
+                        '删除旧文件',
+                        '暂不处理'
+                    );
+                    
+                    if (choice === '删除旧文件') {
+                        const oldChange: GitChange = {
+                            ...item.change,
+                            relativePath: item.change.oldRelativePath,
+                            path: item.change.oldPath!,
+                            type: 'deleted'
+                        };
+                        await this.deleteRemoteFile(oldChange);
+                        vscode.window.showInformationMessage(`已删除远程旧文件: ${item.change.oldRelativePath}`);
+                    }
+                } else {
+                    vscode.window.showInformationMessage(`文件 ${item.change.relativePath} 上传成功`);
+                }
             }
             
             this.refresh();

@@ -74,12 +74,8 @@ export class GitChangeDetector {
         const localPath = project.localPath;
         
         try {
-            await execAsync('git config core.quotepath false', { 
-                cwd: localPath 
-            });
-
             const { stdout: statusOutput } = await execAsync(
-                'git status -M --porcelain -uall',
+                'git -c core.quotepath=false status -M --porcelain -uall',
                 { 
                     cwd: localPath, 
                     maxBuffer: 1024 * 1024 * 10,

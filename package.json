@@ -53,11 +53,13 @@
       },
       {
         "command": "RemoteTest.uploadFile",
-        "title": "RemoteTest: 上传文件"
+        "title": "RemoteTest: 上传文件",
+        "icon": "$(cloud-upload)"
       },
       {
         "command": "RemoteTest.syncFile",
-        "title": "RemoteTest: 同步文件"
+        "title": "RemoteTest: 下载文件",
+        "icon": "$(cloud-download)"
       },
       {
         "command": "RemoteTest.refreshLogs",
@@ -91,12 +93,12 @@
       },
       {
         "command": "RemoteTest.uploadProjectChanges",
-        "title": "上传此项目所有变更",
+        "title": "同步此项目所有变更",
         "icon": "$(cloud-upload)"
       },
       {
         "command": "RemoteTest.uploadSelectedChange",
-        "title": "上传此文件",
+        "title": "同步此文件",
         "icon": "$(cloud-upload)"
       },
       {
@@ -182,11 +184,13 @@
         },
         {
           "command": "RemoteTest.uploadFile",
-          "group": "RemoteTest@2"
+          "group": "RemoteTest@2",
+          "title": "上传文件"
         },
         {
           "command": "RemoteTest.syncFile",
-          "group": "RemoteTest@3"
+          "group": "RemoteTest@3",
+          "title": "下载文件"
         }
       ]
     },
