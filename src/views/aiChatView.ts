@@ -133,7 +133,22 @@ function highlightCode(code: string, lang: string): string {
 }
 
 function enhanceMarkdown(html: string): string {
-    html = html.replace(/<pre><code(?: class="language-(\w+)")?>([\s\S]*?)<\/code><\/pre>/g, (match, lang, code) => {
+    html = html.replace(/<pre[^>]*>([\s\S]*?)<\/pre>/g, (match, preContent) => {
+        if (match.includes('code-header')) {
+            return match;
+        }
+        
+        let lang = '';
+        let code = '';
+        
+        const codeMatch = preContent.match(/<code(?:\s+class="language-(\w+)")?>([\s\S]*?)<\/code>/);
+        if (codeMatch) {
+            lang = codeMatch[1] || '';
+            code = codeMatch[2];
+        } else {
+            code = preContent;
+        }
+        
         const langDisplay = lang ? `<span class="code-lang">${lang}</span>` : '';
         const highlightedCode = highlightCode(code, lang);
         return `<pre><div class="code-header">${langDisplay}<button class="copy-btn" title="复制代码"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button></div><code>${highlightedCode}</code></pre>`;
@@ -634,9 +649,9 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         }
         
         .msg { 
-            margin-bottom: 12px; 
+            margin-bottom: 8px; 
             display: flex;
-            gap: 8px;
+            gap: 6px;
             align-items: flex-start;
         }
         
@@ -645,8 +660,8 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         }
         
         .avatar {
-            width: 28px;
-            height: 28px;
+            width: 24px;
+            height: 24px;
             border-radius: 4px;
             display: flex;
             align-items: center;
@@ -667,8 +682,8 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         }
         
         .avatar svg {
-            width: 26px;
-            height: 26px;
+            width: 22px;
+            height: 22px;
             stroke: var(--vscode-button-fg);
             stroke-width: 1.5;
             fill: none;
@@ -683,7 +698,7 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         }
         
         .bubble { 
-            padding: 8px 12px; 
+            padding: 6px 10px; 
             border-radius: 4px; 
             max-width: 85%; 
             line-height: 1.5;
@@ -714,18 +729,21 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
             background: var(--vscode-widget-bg); 
             border-radius: 4px; 
             overflow: hidden; 
-            margin: 8px 0; 
+            margin: 6px 0; 
             border: 1px solid var(--vscode-widget-border);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
         }
         
         .bubble pre code { 
             display: block; 
-            padding: 8px; 
+            padding: 6px 8px; 
             overflow-x: auto; 
             font-family: var(--vscode-editor-font-family, 'Consolas', 'Monaco', 'Courier New', monospace); 
             font-size: 11px; 
-            line-height: 1.5; 
+            line-height: 1.4; 
             background: none;
+            white-space: pre;
+            word-wrap: normal;
         }
         
         .code-header { 
@@ -735,38 +753,45 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
             padding: 4px 8px; 
             background: var(--vscode-widget-bg); 
             border-bottom: 1px solid var(--vscode-widget-border);
+            gap: 4px;
         }
         
         .code-lang { 
-            font-size: 11px; 
-            color: var(--vscode-sidebar-fg); 
+            font-size: 10px; 
+            color: var(--vscode-editor-foreground); 
             font-family: var(--vscode-editor-font-family, 'Consolas', 'Monaco', monospace); 
             text-transform: uppercase;
+            font-weight: 500;
+            padding: 1px 5px;
+            background: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border-radius: 3px;
         }
         
         .copy-btn { 
             background: transparent; 
             color: var(--vscode-sidebar-fg); 
-            border: 1px solid transparent; 
-            border-radius: 4px; 
-            padding: 4px 8px; 
+            border: none; 
+            border-radius: 3px; 
+            padding: 3px; 
             cursor: pointer; 
             display: flex; 
             align-items: center; 
-            gap: 4px; 
+            justify-content: center;
             font-size: 11px; 
-            transition: all 0.15s ease;
+            transition: all 0.2s ease;
+            opacity: 0.7;
         }
         
         .copy-btn:hover { 
             color: var(--vscode-fg); 
             background: var(--vscode-list-hover);
-            border-color: var(--vscode-widget-border);
+            opacity: 1;
         }
         
         .copy-btn svg { 
-            width: 12px; 
-            height: 12px; 
+            width: 14px; 
+            height: 14px; 
             stroke: currentColor; 
             stroke-width: 2; 
             fill: none;
@@ -774,7 +799,8 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         
         .copy-btn.copied { 
             color: var(--vscode-success);
-            border-color: var(--vscode-success);
+            background: var(--vscode-list-hover);
+            gap: 3px;
         }
         
         .bubble code { 
@@ -827,44 +853,50 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         .assistant .bubble h1, .assistant .bubble h2, .assistant .bubble h3, .assistant .bubble h4, .assistant .bubble h5, .assistant .bubble h6,
         .user .bubble h1, .user .bubble h2, .user .bubble h3, .user .bubble h4, .user .bubble h5, .user .bubble h6 {
             color: var(--vscode-editor-foreground) !important;
-            margin: 12px 0 8px 0;
+            margin: 10px 0 6px 0;
             font-weight: 600;
-            line-height: 1.4;
+            line-height: 1.3;
         }
         
-        .bubble h1 { font-size: 1.6em; }
-        .bubble h2 { font-size: 1.4em; }
-        .bubble h3 { font-size: 1.2em; }
-        .bubble h4 { font-size: 1.1em; }
+        .bubble h1 { font-size: 1.4em; border-bottom: 1px solid var(--vscode-border); padding-bottom: 4px; }
+        .bubble h2 { font-size: 1.25em; border-bottom: 1px solid var(--vscode-border); padding-bottom: 3px; }
+        .bubble h3 { font-size: 1.15em; }
+        .bubble h4 { font-size: 1.05em; }
         .bubble h5, .bubble h6 { font-size: 1em; }
         
         .bubble p {
-            margin: 8px 0;
-            line-height: 1.6;
+            margin: 6px 0;
+            line-height: 1.5;
         }
         
         .bubble ul, .bubble ol {
-            margin: 8px 0 8px 20px;
+            margin: 6px 0 6px 20px;
             padding: 0;
         }
         
         .bubble li {
             margin: 4px 0;
-            line-height: 1.6;
+            line-height: 1.5;
         }
         
         .bubble blockquote {
-            border-left: 3px solid var(--vscode-border);
+            border-left: 3px solid var(--vscode-button-background);
             padding-left: 12px;
             margin: 8px 0;
             color: var(--vscode-editor-foreground);
             opacity: 0.9;
+            background: var(--vscode-widget-bg);
+            padding: 8px 12px;
+            border-radius: 0 4px 4px 0;
         }
         
         .bubble table {
             width: 100%;
             border-collapse: collapse;
-            margin: 12px 0;
+            margin: 10px 0;
+            border-radius: 4px;
+            overflow: hidden;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
         }
         
         .bubble tr {
@@ -877,13 +909,23 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
             color: var(--vscode-editor-foreground);
         }
         
+        .bubble th {
+            background: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            font-weight: 600;
+        }
+        
+        .bubble tr:nth-child(even) {
+            background: var(--vscode-widget-bg);
+        }
+        
         .bubble code:not(pre code) {
             background: var(--vscode-widget-bg);
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-family: Consolas, Monaco, monospace;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-family: var(--vscode-editor-font-family, Consolas, Monaco, monospace);
             font-size: 0.9em;
-            color: var(--vscode-editor-foreground);
+            color: var(--vscode-terminal-ansiRed);
             border: 1px solid var(--vscode-widget-border);
         }
         
@@ -896,16 +938,32 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
             text-decoration: underline;
         }
         
-        .hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-name, .hljs-tag { color: var(--vscode-textLink-foreground); }
-        .hljs-string, .hljs-title, .hljs-section, .hljs-attribute, .hljs-literal, .hljs-template-tag, .hljs-template-variable, .hljs-type { color: var(--vscode-editor-foreground); }
-        .hljs-comment, .hljs-deletion { color: var(--vscode-editor-foreground); opacity: 0.6; }
-        .hljs-number, .hljs-regexp, .hljs-addition { color: var(--vscode-textLink-foreground); }
-        .hljs-function { color: var(--vscode-textLink-foreground); }
-        .hljs-variable, .hljs-params { color: var(--vscode-editor-foreground); }
-        .hljs-class .hljs-title { color: var(--vscode-textLink-foreground); }
-        .hljs-symbol, .hljs-bullet { color: var(--vscode-editor-foreground); }
-        .hljs-meta { color: var(--vscode-editor-foreground); opacity: 0.7; }
-        .hljs-link { color: var(--vscode-link); text-decoration: underline; }
+        .hljs-keyword { color: var(--vscode-terminal-ansiBlue); }
+        .hljs-selector-tag { color: var(--vscode-terminal-ansiBlue); }
+        .hljs-built_in { color: var(--vscode-terminal-ansiCyan); }
+        .hljs-name { color: var(--vscode-terminal-ansiCyan); }
+        .hljs-tag { color: var(--vscode-terminal-ansiBlue); }
+        .hljs-string { color: var(--vscode-terminal-ansiRed); }
+        .hljs-title { color: var(--vscode-terminal-ansiYellow); }
+        .hljs-section { color: var(--vscode-terminal-ansiYellow); }
+        .hljs-attribute { color: var(--vscode-terminal-ansiCyan); }
+        .hljs-literal { color: var(--vscode-terminal-ansiBlue); }
+        .hljs-template-tag { color: var(--vscode-terminal-ansiBlue); }
+        .hljs-template-variable { color: var(--vscode-terminal-ansiCyan); }
+        .hljs-type { color: var(--vscode-terminal-ansiCyan); }
+        .hljs-comment { color: var(--vscode-terminal-ansiGreen); opacity: 0.8; }
+        .hljs-deletion { color: var(--vscode-terminal-ansiRed); }
+        .hljs-number { color: var(--vscode-terminal-ansiYellow); }
+        .hljs-regexp { color: var(--vscode-terminal-ansiRed); }
+        .hljs-addition { color: var(--vscode-terminal-ansiGreen); }
+        .hljs-function { color: var(--vscode-terminal-ansiYellow); }
+        .hljs-variable { color: var(--vscode-terminal-ansiCyan); }
+        .hljs-params { color: var(--vscode-terminal-ansiCyan); }
+        .hljs-class .hljs-title { color: var(--vscode-terminal-ansiCyan); }
+        .hljs-symbol { color: var(--vscode-terminal-ansiMagenta); }
+        .hljs-bullet { color: var(--vscode-terminal-ansiBlue); }
+        .hljs-meta { color: var(--vscode-terminal-ansiYellow); opacity: 0.8; }
+        .hljs-link { color: var(--vscode-terminal-ansiBlue); text-decoration: underline; }
         
         .input-area { 
             padding: 8px; 
