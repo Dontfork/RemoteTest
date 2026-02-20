@@ -1,4 +1,4 @@
-import { AutoTestConfig, ProjectConfig, ServerConfig, AIConfig } from '../types';
+import { RemoteTestConfig, ProjectConfig, ServerConfig, AIConfig } from '../types';
 
 export interface ConfigValidationResult {
     isValid: boolean;

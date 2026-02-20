@@ -33,15 +33,15 @@
       ],
       "explorer": [
         {
-          "id": "autotestQuickCommands",
+          "id": "RemoteTestQuickCommands",
           "name": "快捷命令"
         },
         {
-          "id": "autotestChanges",
+          "id": "RemoteTestChanges",
           "name": "修改监控"
         },
         {
-          "id": "autotestLogs",
+          "id": "RemoteTestLogs",
           "name": "日志监控"
         }
       ]
@@ -121,59 +121,59 @@
       "view/title": [
         {
           "command": "RemoteTest.refreshQuickCommands",
-          "when": "view == autotestQuickCommands",
+          "when": "view == RemoteTestQuickCommands",
           "group": "navigation@1"
         },
         {
           "command": "RemoteTest.refreshLogs",
-          "when": "view == autotestLogs",
+          "when": "view == RemoteTestLogs",
           "group": "navigation@1"
         },
         {
           "command": "RemoteTest.reloadConfig",
-          "when": "view == autotestLogs",
+          "when": "view == RemoteTestLogs",
           "group": "navigation@2"
         },
         {
           "command": "RemoteTest.openConfig",
-          "when": "view == autotestLogs",
+          "when": "view == RemoteTestLogs",
           "group": "navigation@3"
         },
         {
           "command": "RemoteTest.refreshChanges",
-          "when": "view == autotestChanges",
+          "when": "view == RemoteTestChanges",
           "group": "navigation@1"
         }
       ],
       "view/item/context": [
         {
           "command": "RemoteTest.executeQuickCommand",
-          "when": "view == autotestQuickCommands && viewItem == quickCommand",
+          "when": "view == RemoteTestQuickCommands && viewItem == quickCommand",
           "group": "inline@1"
         },
         {
           "command": "RemoteTest.downloadLog",
-          "when": "view == autotestLogs && viewItem == logFile",
+          "when": "view == RemoteTestLogs && viewItem == logFile",
           "group": "inline@1"
         },
         {
           "command": "RemoteTest.openLog",
-          "when": "view == autotestLogs && viewItem == logFile",
+          "when": "view == RemoteTestLogs && viewItem == logFile",
           "group": "inline@2"
         },
         {
           "command": "RemoteTest.uploadProjectChanges",
-          "when": "view == autotestChanges && viewItem == changeGroup",
+          "when": "view == RemoteTestChanges && viewItem == changeGroup",
           "group": "inline@1"
         },
         {
           "command": "RemoteTest.uploadSelectedChange",
-          "when": "view == autotestChanges && viewItem == change",
+          "when": "view == RemoteTestChanges && viewItem =~ /^change($| )/",
           "group": "inline@1"
         },
         {
           "command": "RemoteTest.openChangeFile",
-          "when": "view == autotestChanges && viewItem == change",
+          "when": "view == RemoteTestChanges && viewItem == change",
           "group": "inline@2"
         }
       ],

@@ -75,7 +75,7 @@
 ### 3.1 完整配置结构
 
 ```typescript
-interface AutoTestConfig {
+interface RemoteTestConfig {
     projects: ProjectConfig[];  // 多工程配置数组
     ai: AIConfig;               // AI 服务配置（全局）
     refreshInterval?: number;   // 日志刷新间隔（全局，毫秒），默认 0（禁用自动刷新）
@@ -366,7 +366,7 @@ interface ProjectLogsConfig {
 
 ### 4.1 核心函数
 
-#### loadConfig(workspacePath: string): AutoTestConfig
+#### loadConfig(workspacePath: string): RemoteTestConfig
 
 加载配置文件，如不存在则创建默认配置。
 
@@ -374,7 +374,7 @@ interface ProjectLogsConfig {
 - `workspacePath`: 工作区路径
 
 **返回值**：
-- `AutoTestConfig`: 配置对象
+- `RemoteTestConfig`: 配置对象
 
 **实现逻辑**：
 ```
@@ -394,12 +394,12 @@ interface ProjectLogsConfig {
 5. 返回配置对象
 ```
 
-#### getConfig(): AutoTestConfig
+#### getConfig(): RemoteTestConfig
 
 获取当前已加载的配置。
 
 **返回值**：
-- `AutoTestConfig`: 当前配置对象
+- `RemoteTestConfig`: 当前配置对象
 
 **注意**：如未调用 loadConfig，返回默认配置。
 
@@ -425,7 +425,7 @@ interface ProjectLogsConfig {
 2. 检查文件路径是否以工程的 `localPath` 开头（忽略大小写）
 3. 选择最长匹配的工程（处理嵌套路径）
 
-#### reloadConfig(workspacePath?: string): AutoTestConfig
+#### reloadConfig(workspacePath?: string): RemoteTestConfig
 
 重新加载配置文件。
 
@@ -433,7 +433,7 @@ interface ProjectLogsConfig {
 - `workspacePath`: 工作区路径（可选，默认使用当前工作区）
 
 **返回值**：
-- `AutoTestConfig`: 重新加载后的配置对象
+- `RemoteTestConfig`: 重新加载后的配置对象
 
 **特性**：
 - 如果配置发生变化，会触发 `onConfigChanged` 事件通知所有监听者
@@ -472,7 +472,7 @@ onConfigChanged((newConfig) => {
 ### 4.2 默认配置
 
 ```typescript
-const defaultConfig: AutoTestConfig = {
+const defaultConfig: RemoteTestConfig = {
     projects: [],
     ai: {
         provider: "qwen",

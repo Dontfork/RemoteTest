@@ -2,10 +2,10 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { 
-    AutoTestConfig, 
+    RemoteTestConfig, 
     ProjectConfig, 
     CommandConfig,
-    LegacyAutoTestConfig,
+    LegacyRemoteTestConfig,
     LegacyLogsConfig,
     AIConfig,
     ProjectLogsConfig
@@ -17,7 +17,7 @@ const defaultAIConfig: AIConfig = {
     models: []
 };
 
-const defaultConfig: AutoTestConfig = {
+const defaultConfig: RemoteTestConfig = {
     projects: [],
     ai: defaultAIConfig,
     refreshInterval: 0
@@ -92,7 +92,7 @@ function convertLegacyLogsConfig(legacyLogs: LegacyLogsConfig | undefined, proje
     };
 }
 
-function convertLegacyConfig(legacy: LegacyAutoTestConfig, workspacePath: string): AutoTestConfig {
+function convertLegacyConfig(legacy: LegacyRemoteTestConfig, workspacePath: string): RemoteTestConfig {
     const projects: ProjectConfig[] = [];
     
     if (legacy.server) {
@@ -157,10 +157,10 @@ function convertLegacyConfig(legacy: LegacyAutoTestConfig, workspacePath: string
     };
 }
 
-let config: AutoTestConfig | null = null;
+let config: RemoteTestConfig | null = null;
 let configFilePath: string = '';
 let fileWatcher: vscode.FileSystemWatcher | null = null;
-let configChangeEmitter = new vscode.EventEmitter<AutoTestConfig>();
+let configChangeEmitter = new vscode.EventEmitter<RemoteTestConfig>();
 let isReloadingConfig = false;
 
 export const onConfigChanged = configChangeEmitter.event;
@@ -180,7 +180,7 @@ function ensureProjectLogs(project: any): void {
     }
 }
 
-export function loadConfig(workspacePath: string): AutoTestConfig {
+export function loadConfig(workspacePath: string): RemoteTestConfig {
     const configPath = vscode.workspace.getConfiguration('RemoteTest').get<string>('configPath') || 'RemoteTest-config.json';
     
     const pathsToTry = [
@@ -211,7 +211,7 @@ export function loadConfig(workspacePath: string): AutoTestConfig {
             fs.writeFileSync(fullPath, JSON.stringify(defaultConfig, null, 4), 'utf-8');
             vscode.window.showInformationMessage(`已创建默认配置文件: ${path.join('.vscode', configPath)}`);
             config = defaultConfig;
-            return config as AutoTestConfig;
+            return config as RemoteTestConfig;
         }
         
         const content = fs.readFileSync(fullPath, 'utf-8');
@@ -278,14 +278,14 @@ export function loadConfig(workspacePath: string): AutoTestConfig {
             vscode.window.showInformationMessage('已将旧版配置格式转换为新版多工程格式，建议更新配置文件');
         }
         
-        return config as AutoTestConfig;
+        return config as RemoteTestConfig;
     } catch (error: any) {
         config = defaultConfig;
-        return config as AutoTestConfig;
+        return config as RemoteTestConfig;
     }
 }
 
-export function getConfig(): AutoTestConfig {
+export function getConfig(): RemoteTestConfig {
     return config || defaultConfig;
 }
 
@@ -381,7 +381,7 @@ export function getAllLogDirectories(): { project: ProjectConfig; directory: { n
     return result;
 }
 
-export function reloadConfig(workspacePath?: string): AutoTestConfig {
+export function reloadConfig(workspacePath?: string): RemoteTestConfig {
     const wsPath = workspacePath || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!wsPath) {
         return getConfig();

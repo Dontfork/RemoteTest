@@ -71,7 +71,7 @@ interface ProjectConfig {
     };
 }
 
-interface AutoTestConfig {
+interface RemoteTestConfig {
     projects: ProjectConfig[];
     ai: AIConfig;
     refreshInterval?: number;
@@ -534,9 +534,9 @@ describe('Types Module - 类型定义模块测试', () => {
         });
     });
 
-    describe('AutoTestConfig - 完整配置接口', () => {
+    describe('RemoteTestConfig - 完整配置接口', () => {
         it('验证完整配置结构 - 包含projects、ai、logs三个子配置', () => {
-            const config: AutoTestConfig = {
+            const config: RemoteTestConfig = {
                 projects: [{
                     name: '测试项目',
                     localPath: 'D:\\Projects\\Test',
@@ -576,7 +576,7 @@ describe('Types Module - 类型定义模块测试', () => {
         });
 
         it('验证多项目配置 - 支持多个独立项目', () => {
-            const config: AutoTestConfig = {
+            const config: RemoteTestConfig = {
                 projects: [
                     {
                         name: '项目A',
@@ -641,7 +641,7 @@ describe('Types Module - 类型定义模块测试', () => {
         });
 
         it('验证SSH/SCP完整配置 - 使用密钥认证', () => {
-            const config: AutoTestConfig = {
+            const config: RemoteTestConfig = {
                 projects: [{
                     name: '部署项目',
                     localPath: '/home/deploy/project',

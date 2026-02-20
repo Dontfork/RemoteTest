@@ -604,7 +604,7 @@ describe('SessionManager System Prompt - 系统提示词持久化测试', () => 
         assert.ok(source.includes('saveSystemPrompt'));
     });
 
-    it('系统提示词应存储在.autotest目录下', () => {
+    it('系统提示词应存储在.RemoteTest目录下', () => {
         const sourcePath = path.join(__dirname, '..', '..', '..', 'src', 'ai', 'sessionManager.ts');
         const source = fs.readFileSync(sourcePath, 'utf-8');
         assert.ok(source.includes('system-prompt.json'));

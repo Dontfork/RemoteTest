@@ -60,7 +60,7 @@ export interface ProjectConfig {
     logs?: ProjectLogsConfig;
 }
 
-export interface AutoTestConfig {
+export interface RemoteTestConfig {
     projects: ProjectConfig[];
     ai: AIConfig;
     refreshInterval?: number;
@@ -93,7 +93,7 @@ export interface LegacyLogsConfig {
     refreshInterval: number;
 }
 
-export interface LegacyAutoTestConfig {
+export interface LegacyRemoteTestConfig {
     server?: LegacyServerConfig;
     command?: LegacyCommandConfig;
     ai?: AIConfig;

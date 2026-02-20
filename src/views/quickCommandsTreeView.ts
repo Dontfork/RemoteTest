@@ -96,11 +96,11 @@ export class QuickCommandsTreeView {
         this.pluginChannel = channelManager.getRemoteTestChannel();
         this.testOutputChannel = channelManager.getTestOutputChannel();
         this.treeProvider = new QuickCommandsTreeProvider(this.detector);
-        this.treeView = vscode.window.createTreeView('autotestQuickCommands', {
+        this.treeView = vscode.window.createTreeView('RemoteTestQuickCommands', {
             treeDataProvider: this.treeProvider,
             showCollapseAll: true
         });
-        vscode.commands.executeCommand('workbench.actions.treeView.autotestQuickCommands.collapseAll');
+        vscode.commands.executeCommand('workbench.actions.treeView.RemoteTestQuickCommands.collapseAll');
     }
 
     refresh(): void {

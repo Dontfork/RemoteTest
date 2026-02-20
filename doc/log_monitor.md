@@ -174,7 +174,7 @@ interface ProjectLogsConfig {
 ### 3.4 全局配置
 
 ```typescript
-interface AutoTestConfig {
+interface RemoteTestConfig {
     projects: ProjectConfig[];  // 多工程配置数组
     ai: AIConfig;               // AI 服务配置
     refreshInterval?: number;   // 全局日志刷新间隔（毫秒），默认 0（禁用）

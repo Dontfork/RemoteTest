@@ -46,7 +46,7 @@ interface AIConfig {
     };
 }
 
-interface AutoTestConfig {
+interface RemoteTestConfig {
     projects: ProjectConfig[];
     ai: AIConfig;
     refreshInterval?: number;
@@ -180,9 +180,9 @@ describe('Multi-Project Configuration - 多工程配置测试', () => {
         });
     });
 
-    describe('AutoTestConfig - 多工程配置结构', () => {
+    describe('RemoteTestConfig - 多工程配置结构', () => {
         it('验证多工程配置结构 - 包含projects数组', () => {
-            const config: AutoTestConfig = {
+            const config: RemoteTestConfig = {
                 projects: [
                     {
                         name: '项目A',
@@ -504,7 +504,7 @@ describe('Multi-Project Configuration - 多工程配置测试', () => {
 
     describe('ServerConfig per Project - 每个工程独立服务器配置', () => {
         it('验证不同工程使用不同服务器', () => {
-            const config: AutoTestConfig = {
+            const config: RemoteTestConfig = {
                 projects: [
                     {
                         name: '开发环境',

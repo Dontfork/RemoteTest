@@ -37,7 +37,7 @@ export class ChangeTreeItem extends vscode.TreeItem {
 
     private getContextValueForChange(change: GitChange): string {
         if (change.type === 'deleted') {
-            return 'deletedChange';
+            return 'change deletedChange';
         }
         if (change.type === 'renamed' || change.type === 'moved') {
             return 'change';
@@ -152,11 +152,11 @@ export class ChangesTreeView {
         this.gitDetector = new GitChangeDetector();
         this.treeProvider = new ChangesTreeProvider(this.gitDetector);
         this.fileUploader = fileUploader;
-        this.treeView = vscode.window.createTreeView('autotestChanges', {
+        this.treeView = vscode.window.createTreeView('RemoteTestChanges', {
             treeDataProvider: this.treeProvider,
             showCollapseAll: true
         });
-        vscode.commands.executeCommand('workbench.actions.treeView.autotestChanges.collapseAll');
+        vscode.commands.executeCommand('workbench.actions.treeView.RemoteTestChanges.collapseAll');
     }
 
     refresh(): void {

@@ -75,7 +75,7 @@ const testOutputChannel = channelManager.getTestOutputChannel();
 ### 5.2 配置接口
 
 ```typescript
-interface AutoTestConfig {
+interface RemoteTestConfig {
     projects: ProjectConfig[];      // 多工程配置数组
     ai: AIConfig;                   // AI 服务配置（全局）
     refreshInterval?: number;       // 日志刷新间隔（毫秒）

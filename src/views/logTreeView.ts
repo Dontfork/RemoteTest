@@ -154,11 +154,11 @@ export class LogTreeView {
     constructor() {
         this.logMonitor = new LogMonitor();
         this.treeProvider = new LogsTreeProvider(this.logMonitor);
-        this.treeView = vscode.window.createTreeView('autotestLogs', {
+        this.treeView = vscode.window.createTreeView('RemoteTestLogs', {
             treeDataProvider: this.treeProvider,
             showCollapseAll: true
         });
-        vscode.commands.executeCommand('workbench.actions.treeView.autotestLogs.collapseAll');
+        vscode.commands.executeCommand('workbench.actions.treeView.RemoteTestLogs.collapseAll');
     }
 
     start(): void {
