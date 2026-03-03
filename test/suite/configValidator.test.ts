@@ -194,119 +194,6 @@ describe('Config Validator Module - 配置验证模块测试', () => {
         });
     });
 
-    describe('AI配置验证 - AI Config Validation', () => {
-        
-        it('验证缺少ai配置 - 应给出警告', () => {
-            const config: any = {
-                projects: [{
-                    name: 'TestProject',
-                    localPath: '/path/to/project',
-                    server: {
-                        host: '192.168.1.1',
-                        port: 22,
-                        username: 'user',
-                        password: 'pass',
-                        remoteDirectory: '/home/user'
-                    }
-                }]
-            };
-            const result = validateConfig(config);
-            
-            assert.ok(result.warnings.some((w: string) => w.includes('ai')));
-        });
-
-        it('验证空models数组 - 应给出警告', () => {
-            const config: any = {
-                projects: [{
-                    name: 'TestProject',
-                    localPath: '/path/to/project',
-                    server: {
-                        host: '192.168.1.1',
-                        port: 22,
-                        username: 'user',
-                        password: 'pass',
-                        remoteDirectory: '/home/user'
-                    }
-                }],
-                ai: {
-                    models: []
-                }
-            };
-            const result = validateConfig(config);
-            
-            assert.ok(result.warnings.some((w: string) => w.includes('models') && w.includes('空')));
-        });
-
-        it('验证旧AI配置格式 - 应给出警告', () => {
-            const config: any = {
-                projects: [{
-                    name: 'TestProject',
-                    localPath: '/path/to/project',
-                    server: {
-                        host: '192.168.1.1',
-                        port: 22,
-                        username: 'user',
-                        password: 'pass',
-                        remoteDirectory: '/home/user'
-                    }
-                }],
-                ai: {
-                    provider: 'qwen',
-                    qwen: { apiKey: 'test-key' },
-                    openai: { apiKey: '' }
-                }
-            };
-            const result = validateConfig(config);
-            
-            assert.ok(result.warnings.some((w: string) => w.includes('models')));
-        });
-
-        it('验证自部署模型无apiKey - 应通过', () => {
-            const config: any = {
-                projects: [{
-                    name: 'TestProject',
-                    localPath: '/path/to/project',
-                    server: {
-                        host: '192.168.1.1',
-                        port: 22,
-                        username: 'user',
-                        password: 'pass',
-                        remoteDirectory: '/home/user'
-                    }
-                }],
-                ai: {
-                    models: [{ name: 'local-llm', apiUrl: 'http://localhost:8000/v1/chat' }]
-                }
-            };
-            const result = validateConfig(config);
-            
-            assert.strictEqual(result.isValid, true);
-        });
-
-        it('验证全局代理配置格式 - 应验证格式', () => {
-            const config: any = {
-                projects: [{
-                    name: 'TestProject',
-                    localPath: '/path/to/project',
-                    server: {
-                        host: '192.168.1.1',
-                        port: 22,
-                        username: 'user',
-                        password: 'pass',
-                        remoteDirectory: '/home/user'
-                    }
-                }],
-                ai: {
-                    models: [{ name: 'qwen-turbo', apiKey: 'test-key' }],
-                    proxy: 'invalid-proxy'
-                }
-            };
-            const result = validateConfig(config);
-            
-            assert.ok(result.warnings.some((w: string) => w.includes('proxy') && w.includes('格式不正确')));
-        });
-    });
-
     describe('命令和日志配置验证 - Commands and Logs Validation', () => {
         
         it('验证未配置commands - 应给出警告', () => {
@@ -370,9 +257,6 @@ describe('Config Validator Module - 配置验证模块测试', () => {
                         downloadPath: '/tmp/logs'
                     }
                 }],
-                ai: {
-                    models: [{ name: 'qwen-turbo', apiKey: 'test-key' }]
-                },
                 refreshInterval: 5000
             };
             const result = validateConfig(config);
@@ -415,28 +299,6 @@ describe('Config Validator Module - 配置验证模块测试', () => {
             
             assert.ok(filled.projects[0].server);
             assert.strictEqual(filled.projects[0].server.port, 22);
-        });
-
-        it('填充缺失的ai配置', () => {
-            const config: any = {
-                projects: [{
-                    name: 'TestProject',
-                    localPath: '/path/to/project',
-                    server: {
-                        host: '192.168.1.1',
-                        port: 22,
-                        username: 'user',
-                        password: 'pass',
-                        remoteDirectory: '/home/user'
-                    }
-                }]
-            };
-            const missingFields: MissingField[] = [];
-            
-            const filled = fillMissingFields(config, missingFields);
-            
-            assert.ok(filled.ai);
-            assert.ok(Array.isArray(filled.ai.models));
         });
 
         it('填充缺失的refreshInterval', () => {
@@ -682,41 +544,11 @@ describe('Config Validator Module - 配置验证模块测试', () => {
                         password: 'pass',
                         remoteDirectory: '/home/user'
                     }
-                }],
-                ai: {
-                    models: [{
-                        name: 'qwen-turbo',
-                        apiKey: 'test-key',
-                        apiUrl: 'not-a-valid-url'
-                    }]
-                }
+                }]
             };
             const result = validateConfig(config);
             
             assert.ok(result.warnings.some((w: string) => w.includes('apiUrl') && w.includes('有效的 URL')));
-        });
-
-        it('验证defaultModel不存在于models中 - 应警告', () => {
-            const config: any = {
-                projects: [{
-                    name: 'TestProject',
-                    localPath: '/path/to/project',
-                    server: {
-                        host: '192.168.1.1',
-                        port: 22,
-                        username: 'user',
-                        password: 'pass',
-                        remoteDirectory: '/home/user'
-                    }
-                }],
-                ai: {
-                    models: [{ name: 'qwen-turbo', apiKey: 'test-key' }],
-                    defaultModel: 'non-existent-model'
-                }
-            };
-            const result = validateConfig(config);
-            
-            assert.ok(result.warnings.some((w: string) => w.includes('defaultModel') && w.includes('不存在')));
         });
 
         it('验证命令缺少executeCommand - 应报错', () => {

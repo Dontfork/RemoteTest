@@ -13,8 +13,40 @@ import { validateConfig, fillMissingFields } from './validator';
 import { showValidationMessages, saveConfigWithDefaults } from './validatorUI';
 
 const defaultConfig: RemoteTestConfig = {
-    projects: [],
-    refreshInterval: 0
+    projects: [
+        {
+            name: "我的测试项目",
+            localPath: "",
+            enabled: true,
+            server: {
+                host: "192.168.1.100",
+                port: 22,
+                username: "root",
+                password: "",
+                privateKeyPath: "",
+                remoteDirectory: "/home/user/project"
+            },
+            commands: [
+                {
+                    name: "运行测试",
+                    executeCommand: "pytest {filePath} -v",
+                    runnable: true,
+                    clearOutputBeforeRun: true,
+                    includePatterns: ["PASSED", "FAILED", "ERROR"],
+                    excludePatterns: []
+                }
+            ],
+            logs: {
+                directories: [
+                    { name: "应用日志", path: "/var/log/app" }
+                ],
+                downloadPath: "D:\\downloads\\logs"
+            }
+        }
+    ],
+    refreshInterval: 0,
+    useLogOutputChannel: true,
+    textFileExtensions: []
 };
 
 function deepMerge<T>(target: T, source: Partial<T>): T {
@@ -200,14 +232,18 @@ export function loadConfig(workspacePath: string): RemoteTestConfig {
 
     try {
         if (!fs.existsSync(fullPath)) {
+            console.log('[RemoteTest] Config file not found, creating default config...');
             const vscodeDir = path.join(workspacePath, '.vscode');
             if (!fs.existsSync(vscodeDir)) {
                 fs.mkdirSync(vscodeDir, { recursive: true });
             }
             fs.writeFileSync(fullPath, JSON.stringify(defaultConfig, null, 4), 'utf-8');
+            console.log('[RemoteTest] Default config created at:', fullPath);
             vscode.window.showInformationMessage(`已创建默认配置文件: ${path.join('.vscode', configPath)}`);
             config = defaultConfig;
             return config as RemoteTestConfig;
+        } else {
+            console.log('[RemoteTest] Config file exists, loading...');
         }
         
         const content = fs.readFileSync(fullPath, 'utf-8');

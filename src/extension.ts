@@ -135,8 +135,6 @@ export function activate(context: vscode.ExtensionContext) {
                         continue;
                     }
                 }
-                
-                vscode.window.showWarningMessage('未找到配置文件，将在首次使用时自动创建');
             } else {
                 vscode.window.showWarningMessage('无法打开配置文件：未找到工作区');
             }

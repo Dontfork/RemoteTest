@@ -32,21 +32,28 @@
     {
       "name": "我的测试项目",
       "localPath": "D:\\myproject",
+      "enabled": true,
       "server": {
         "host": "192.168.1.100",
         "port": 22,
         "username": "root",
-        "password": "your-password"
+        "password": "your-password",
+        "privateKeyPath": "",
+        "remoteDirectory": "/home/user/myproject"
       },
-      "remoteDirectory": "/home/user/myproject",
       "commands": [
         {
           "name": "运行测试",
-          "executeCommand": "pytest {filePath} -v"
+          "executeCommand": "pytest {filePath} -v",
+          "runnable": true,
+          "clearOutputBeforeRun": true,
+          "includePatterns": ["PASSED", "FAILED", "ERROR"],
+          "excludePatterns": []
         },
         {
           "name": "清理缓存",
-          "executeCommand": "rm -rf __pycache__"
+          "executeCommand": "rm -rf __pycache__",
+          "runnable": false
         }
       ],
       "logs": {
@@ -59,7 +66,10 @@
         "downloadPath": "D:\\downloads\\logs"
       }
     }
-  ]
+  ],
+  "refreshInterval": 0,
+  "useLogOutputChannel": true,
+  "textFileExtensions": []
 }
 ```
 

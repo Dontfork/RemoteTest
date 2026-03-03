@@ -58,13 +58,6 @@ npm test
 - [ ] `RemoteTest-config.json` - 更新示例配置
 - [ ] `test/suite/types.test.ts` - 添加类型测试
 
-### 新增 AI 功能
-
-- [ ] `src/types/index.ts` - 添加类型定义
-- [ ] `src/ai/providers.ts` - 实现或修改 Provider
-- [ ] `doc/ai.md` - 更新 AI 模块文档
-- [ ] `test/suite/ai.test.ts` - 添加测试用例
-
 ### 新增命令执行功能
 
 - [ ] `src/types/index.ts` - 添加类型定义

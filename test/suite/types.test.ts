@@ -31,24 +31,6 @@ interface CommandVariables {
     remoteDir: string;
 }
 
-interface QWenConfig {
-    apiKey: string;
-    apiUrl: string;
-    model: string;
-}
-
-interface OpenAIConfig {
-    apiKey: string;
-    apiUrl: string;
-    model: string;
-}
-
-interface AIConfig {
-    provider: 'qwen' | 'openai';
-    qwen: QWenConfig;
-    openai: OpenAIConfig;
-}
-
 interface LogDirectoryConfig {
     name: string;
     path: string;
@@ -73,18 +55,7 @@ interface ProjectConfig {
 
 interface RemoteTestConfig {
     projects: ProjectConfig[];
-    ai: AIConfig;
     refreshInterval?: number;
-}
-
-interface AIMessage {
-    role: 'user' | 'assistant' | 'system';
-    content: string;
-}
-
-interface AIResponse {
-    content: string;
-    error?: string;
 }
 
 interface LogFile {
@@ -402,72 +373,6 @@ describe('Types Module - 类型定义模块测试', () => {
         });
     });
 
-    describe('AIConfig - AI配置接口', () => {
-        it('验证qwen提供者配置 - 使用通义千问API和qwen-turbo模型', () => {
-            const config: AIConfig = {
-                provider: 'qwen',
-                qwen: {
-                    apiKey: 'test-key',
-                    apiUrl: 'https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation',
-                    model: 'qwen-turbo'
-                },
-                openai: {
-                    apiKey: '',
-                    apiUrl: 'https://api.openai.com/v1/chat/completions',
-                    model: 'gpt-3.5-turbo'
-                }
-            };
-            
-            assert.strictEqual(config.provider, 'qwen');
-            assert.ok(config.qwen.apiKey);
-            assert.strictEqual(config.qwen.model, 'qwen-turbo');
-        });
-
-        it('验证openai提供者配置 - 使用OpenAI API和gpt-3.5-turbo模型', () => {
-            const config: AIConfig = {
-                provider: 'openai',
-                qwen: {
-                    apiKey: '',
-                    apiUrl: '',
-                    model: ''
-                },
-                openai: {
-                    apiKey: 'sk-test',
-                    apiUrl: 'https://api.openai.com/v1/chat/completions',
-                    model: 'gpt-4'
-                }
-            };
-            
-            assert.strictEqual(config.provider, 'openai');
-            assert.ok(config.openai.apiKey);
-            assert.strictEqual(config.openai.model, 'gpt-4');
-        });
-
-        it('验证qwen模型可配置 - 支持qwen-turbo、qwen-plus、qwen-max等模型', () => {
-            const qwenModels = ['qwen-turbo', 'qwen-plus', 'qwen-max', 'qwen-max-longcontext'];
-            const config: QWenConfig = {
-                apiKey: 'test-key',
-                apiUrl: 'https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation',
-                model: 'qwen-max'
-            };
-            
-            assert.ok(qwenModels.includes(config.model));
-            assert.strictEqual(config.model, 'qwen-max');
-        });
-
-        it('验证openai模型可配置 - 支持gpt-3.5-turbo、gpt-4等模型', () => {
-            const openaiModels = ['gpt-3.5-turbo', 'gpt-3.5-turbo-16k', 'gpt-4', 'gpt-4-32k'];
-            const config: OpenAIConfig = {
-                apiKey: 'sk-test',
-                apiUrl: 'https://api.openai.com/v1/chat/completions',
-                model: 'gpt-4'
-            };
-            
-            assert.ok(openaiModels.includes(config.model));
-            assert.strictEqual(config.model, 'gpt-4');
-        });
-    });
-
     describe('LogsConfig - 日志配置接口', () => {
         it('验证日志目录列表配置 - 支持多个监控目录', () => {
             const config: LogsConfig = {
@@ -535,7 +440,7 @@ describe('Types Module - 类型定义模块测试', () => {
     });
 
     describe('RemoteTestConfig - 完整配置接口', () => {
-        it('验证完整配置结构 - 包含projects、ai、logs三个子配置', () => {
+        it('验证完整配置结构 - 包含projects和logs子配置', () => {
             const config: RemoteTestConfig = {
                 projects: [{
                     name: '测试项目',
@@ -561,16 +466,10 @@ describe('Types Module - 类型定义模块测试', () => {
                         downloadPath: './downloads'
                     }
                 }],
-                ai: {
-                    provider: 'qwen',
-                    qwen: { apiKey: '', apiUrl: '', model: 'qwen-turbo' },
-                    openai: { apiKey: '', apiUrl: '', model: 'gpt-3.5-turbo' }
-                },
                 refreshInterval: 5000
             };
             
             assert.ok(config.projects);
-            assert.ok(config.ai);
             assert.strictEqual(config.projects.length, 1);
             assert.strictEqual(config.refreshInterval, 5000);
         });
@@ -627,11 +526,6 @@ describe('Types Module - 类型定义模块测试', () => {
                         }
                     }
                 ],
-                ai: {
-                    provider: 'qwen',
-                    qwen: { apiKey: '', apiUrl: '', model: 'qwen-turbo' },
-                    openai: { apiKey: '', apiUrl: '', model: 'gpt-3.5-turbo' }
-                },
                 refreshInterval: 5000
             };
             
@@ -669,70 +563,13 @@ describe('Types Module - 类型定义模块测试', () => {
                         downloadPath: './logs'
                     }
                 }],
-                ai: {
-                    provider: 'openai',
-                    qwen: { apiKey: '', apiUrl: '', model: 'qwen-turbo' },
-                    openai: { apiKey: 'sk-test', apiUrl: '', model: 'gpt-4' }
-                },
                 refreshInterval: 10000
             };
             
             assert.strictEqual(config.projects[0].server.privateKeyPath, '/home/deploy/.ssh/id_rsa');
             assert.strictEqual(config.projects[0].server.remoteDirectory, '/opt/RemoteTest');
             assert.strictEqual(config.projects[0].logs?.directories.length, 2);
-            assert.strictEqual(config.ai.provider, 'openai');
             assert.strictEqual(config.refreshInterval, 10000);
-        });
-    });
-
-    describe('AIMessage - AI消息接口', () => {
-        it('验证用户消息创建 - role为user', () => {
-            const message: AIMessage = {
-                role: 'user',
-                content: 'Hello, AI!'
-            };
-            
-            assert.strictEqual(message.role, 'user');
-            assert.strictEqual(message.content, 'Hello, AI!');
-        });
-
-        it('验证助手消息创建 - role为assistant', () => {
-            const message: AIMessage = {
-                role: 'assistant',
-                content: 'Hello! How can I help you?'
-            };
-            
-            assert.strictEqual(message.role, 'assistant');
-        });
-
-        it('验证系统消息创建 - role为system', () => {
-            const message: AIMessage = {
-                role: 'system',
-                content: 'You are a helpful assistant.'
-            };
-            
-            assert.strictEqual(message.role, 'system');
-        });
-    });
-
-    describe('AIResponse - AI响应接口', () => {
-        it('验证成功响应 - 包含content，无error', () => {
-            const response: AIResponse = {
-                content: 'This is the AI response'
-            };
-            
-            assert.strictEqual(response.content, 'This is the AI response');
-            assert.strictEqual(response.error, undefined);
-        });
-
-        it('验证错误响应 - 包含error信息', () => {
-            const response: AIResponse = {
-                content: '',
-                error: 'API request failed'
-            };
-            
-            assert.strictEqual(response.content, '');
-            assert.strictEqual(response.error, 'API request failed');
         });
     });
 

@@ -32,23 +32,8 @@ interface ProjectConfig {
     logs?: ProjectLogsConfig;
 }
 
-interface AIConfig {
-    provider: 'qwen' | 'openai';
-    qwen: {
-        apiKey: string;
-        apiUrl: string;
-        model: string;
-    };
-    openai: {
-        apiKey: string;
-        apiUrl: string;
-        model: string;
-    };
-}
-
 interface RemoteTestConfig {
     projects: ProjectConfig[];
-    ai: AIConfig;
     refreshInterval?: number;
 }
 
@@ -227,11 +212,6 @@ describe('Multi-Project Configuration - 多工程配置测试', () => {
                         ]
                     }
                 ],
-                ai: {
-                    provider: 'qwen',
-                    qwen: { apiKey: '', apiUrl: '', model: 'qwen-turbo' },
-                    openai: { apiKey: '', apiUrl: '', model: 'gpt-3.5-turbo' }
-                },
                 refreshInterval: 5000
             };
             
@@ -535,11 +515,6 @@ describe('Multi-Project Configuration - 多工程配置测试', () => {
                         commands: []
                     }
                 ],
-                ai: {
-                    provider: 'qwen',
-                    qwen: { apiKey: '', apiUrl: '', model: 'qwen-turbo' },
-                    openai: { apiKey: '', apiUrl: '', model: 'gpt-3.5-turbo' }
-                },
                 refreshInterval: 5000
             };
             
