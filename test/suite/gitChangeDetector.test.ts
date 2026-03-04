@@ -1246,4 +1246,82 @@ describe('GitChangeDetector Module - Git变更检测模块测试', () => {
             return { oldPath: '', newPath: filePath };
         }
     });
+
+    describe('相对路径处理 - 防止路径第一个字符被吃掉', () => {
+        it('验证相对路径转换为绝对路径后计算相对路径 - 不丢失首字符', () => {
+            const localPath = 'project';
+            const filePath = 'src/main.ts';
+            
+            const absolutePath = path.resolve(localPath, filePath);
+            const relativePath = path.relative(path.resolve(localPath), absolutePath).replace(/\\/g, '/');
+            
+            assert.strictEqual(relativePath, 'src/main.ts');
+            assert.ok(relativePath.startsWith('src'));
+        });
+
+        it('验证相对路径不带前导斜杠 - 防止路径计算错误', () => {
+            const localPath = './project';
+            const filePath = 'src/main.ts';
+            
+            const absolutePath = path.resolve(localPath, filePath);
+            const relativePath = path.relative(path.resolve(localPath), absolutePath).replace(/\\/g, '/');
+            
+            assert.strictEqual(relativePath, 'src/main.ts');
+            assert.ok(!relativePath.startsWith('/'));
+        });
+
+        it('验证Windows相对路径处理', () => {
+            const localPath = '.\\project';
+            const filePath = 'src\\main.ts';
+            
+            const absolutePath = path.resolve(localPath, filePath);
+            const displayPath = absolutePath.replace(/\\/g, '/');
+            
+            assert.ok(displayPath.includes('src/main.ts'));
+        });
+
+        it('验证深层相对路径计算正确性', () => {
+            const localPath = path.resolve('workspace/project');
+            const filePath = 'src/nested/deep/file.ts';
+            
+            const absolutePath = path.resolve(localPath, filePath);
+            const relativePath = path.relative(localPath, absolutePath).replace(/\\/g, '/');
+            
+            assert.strictEqual(relativePath, 'src/nested/deep/file.ts');
+        });
+
+        it('验证单文件相对路径计算 - 边界情况', () => {
+            const localPath = 'myproject';
+            const filePath = 'a.txt';
+            
+            const absolutePath = path.resolve(localPath, filePath);
+            const relativePath = path.relative(path.resolve(localPath), absolutePath);
+            
+            assert.strictEqual(relativePath, 'a.txt');
+            assert.strictEqual(relativePath.length, 5);
+            assert.strictEqual(relativePath[0], 'a');
+        });
+
+        it('验证父目录相对路径处理', () => {
+            const localPath = path.resolve('../project');
+            const filePath = 'src/main.ts';
+            
+            const absolutePath = path.resolve(localPath, filePath);
+            const relativePath = path.relative(localPath, absolutePath).replace(/\\/g, '/');
+            
+            assert.strictEqual(relativePath, 'src/main.ts');
+        });
+
+        it('验证displayPath正确转换反斜杠', () => {
+            const localPath = 'project';
+            const filePath = 'src\\main.ts';
+            
+            const absolutePath = path.resolve(localPath, filePath);
+            const relativePath = path.relative(path.resolve(localPath), absolutePath);
+            const displayPath = relativePath.replace(/\\/g, '/');
+            
+            assert.strictEqual(displayPath, 'src/main.ts');
+            assert.ok(!displayPath.includes('\\'));
+        });
+    });
 });

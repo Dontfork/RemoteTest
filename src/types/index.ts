@@ -51,6 +51,7 @@ export interface RemoteTestConfig {
     textFileExtensions?: string[];
     clearOutputBeforeRun?: boolean;
     useLogOutputChannel?: boolean;
+    logViewer?: string;
 }
 
 export interface LegacyServerConfig {

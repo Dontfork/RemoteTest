@@ -36,12 +36,14 @@ export class GitChangeDetector {
                 continue;
             }
             
-            const isGitRepo = await this.isGitRepository(project.localPath);
+            const localPath = path.resolve(project.localPath);
+            
+            const isGitRepo = await this.isGitRepository(localPath);
             if (!isGitRepo) {
                 continue;
             }
 
-            const changes = await this.getProjectChanges(project);
+            const changes = await this.getProjectChanges(project, localPath);
             if (changes.length > 0) {
                 groups.push({
                     projectName: project.name,
@@ -66,13 +68,7 @@ export class GitChangeDetector {
         }
     }
 
-    private async getProjectChanges(project: ProjectConfig): Promise<GitChange[]> {
-        if (!project.localPath) {
-            return [];
-        }
-        
-        const localPath = project.localPath;
-        
+    private async getProjectChanges(project: ProjectConfig, localPath: string): Promise<GitChange[]> {
         try {
             const { stdout: statusOutput } = await execAsync(
                 'git -c core.quotepath=false status -M --porcelain -uall',

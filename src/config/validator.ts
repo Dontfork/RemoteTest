@@ -16,7 +16,7 @@ export interface MissingField {
     defaultValue: any;
 }
 
-const VALID_ROOT_KEYS = ['projects', 'refreshInterval', 'textFileExtensions', 'clearOutputBeforeRun', 'useLogOutputChannel'];
+const VALID_ROOT_KEYS = ['projects', 'refreshInterval', 'textFileExtensions', 'clearOutputBeforeRun', 'useLogOutputChannel', 'logViewer'];
 
 const VALID_PROJECT_KEYS = ['name', 'localPath', 'enabled', 'server', 'commands', 'logs'];
 

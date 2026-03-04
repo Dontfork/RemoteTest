@@ -32,7 +32,7 @@ const defaultConfig: RemoteTestConfig = {
                     executeCommand: "pytest {filePath} -v",
                     runnable: true,
                     clearOutputBeforeRun: true,
-                    includePatterns: ["PASSED", "FAILED", "ERROR"],
+                    includePatterns: [],
                     excludePatterns: []
                 }
             ],
@@ -46,7 +46,8 @@ const defaultConfig: RemoteTestConfig = {
     ],
     refreshInterval: 0,
     useLogOutputChannel: true,
-    textFileExtensions: []
+    textFileExtensions: [],
+    logViewer: ""
 };
 
 function deepMerge<T>(target: T, source: Partial<T>): T {
@@ -303,7 +304,8 @@ export function loadConfig(workspacePath: string): RemoteTestConfig {
                 refreshInterval: finalConfig.refreshInterval ?? 0,
                 textFileExtensions: finalConfig.textFileExtensions,
                 clearOutputBeforeRun: finalConfig.clearOutputBeforeRun ?? true,
-                useLogOutputChannel: finalConfig.useLogOutputChannel ?? true
+                useLogOutputChannel: finalConfig.useLogOutputChannel ?? true,
+                logViewer: finalConfig.logViewer ?? ""
             };
         } else {
             config = convertLegacyConfig(loadedConfig, workspacePath);

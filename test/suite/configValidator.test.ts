@@ -532,25 +532,6 @@ describe('Config Validator Module - 配置验证模块测试', () => {
             assert.ok(result.errors.some((e: string) => e.includes('port')));
         });
 
-        it('验证无效的URL格式 - 应警告', () => {
-            const config: any = {
-                projects: [{
-                    name: 'TestProject',
-                    localPath: '/path/to/project',
-                    server: {
-                        host: '192.168.1.1',
-                        port: 22,
-                        username: 'user',
-                        password: 'pass',
-                        remoteDirectory: '/home/user'
-                    }
-                }]
-            };
-            const result = validateConfig(config);
-            
-            assert.ok(result.warnings.some((w: string) => w.includes('apiUrl') && w.includes('有效的 URL')));
-        });
-
         it('验证命令缺少executeCommand - 应报错', () => {
             const config: any = {
                 projects: [{

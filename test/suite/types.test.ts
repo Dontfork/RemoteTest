@@ -56,6 +56,7 @@ interface ProjectConfig {
 interface RemoteTestConfig {
     projects: ProjectConfig[];
     refreshInterval?: number;
+    logViewer?: string;
 }
 
 interface LogFile {
@@ -570,6 +571,50 @@ describe('Types Module - 类型定义模块测试', () => {
             assert.strictEqual(config.projects[0].server.remoteDirectory, '/opt/RemoteTest');
             assert.strictEqual(config.projects[0].logs?.directories.length, 2);
             assert.strictEqual(config.refreshInterval, 10000);
+        });
+
+        it('验证logViewer配置 - 自定义日志查看程序', () => {
+            const config: RemoteTestConfig = {
+                projects: [{
+                    name: '测试项目',
+                    localPath: 'D:\\Projects\\Test',
+                    server: {
+                        host: '192.168.1.100',
+                        port: 22,
+                        username: 'root',
+                        password: 'password',
+                        privateKeyPath: '',
+                        localProjectPath: '',
+                        remoteDirectory: '/tmp/RemoteTest'
+                    }
+                }],
+                refreshInterval: 5000,
+                logViewer: 'notepad.exe'
+            };
+            
+            assert.strictEqual(config.logViewer, 'notepad.exe');
+        });
+
+        it('验证logViewer为空时使用VSCode打开 - 默认行为', () => {
+            const config: RemoteTestConfig = {
+                projects: [{
+                    name: '测试项目',
+                    localPath: 'D:\\Projects\\Test',
+                    server: {
+                        host: '192.168.1.100',
+                        port: 22,
+                        username: 'root',
+                        password: 'password',
+                        privateKeyPath: '',
+                        localProjectPath: '',
+                        remoteDirectory: '/tmp/RemoteTest'
+                    }
+                }],
+                refreshInterval: 5000,
+                logViewer: ''
+            };
+            
+            assert.strictEqual(config.logViewer, '');
         });
     });
 

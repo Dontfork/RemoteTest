@@ -1,7 +1,30 @@
 import * as vscode from 'vscode';
 import { LogMonitor, formatSize, formatDate } from '../core';
 import { LogFile, LogDirectoryConfig, ProjectConfig } from '../types';
-import { getEnabledProjects } from '../config';
+import { getEnabledProjects, getConfig } from '../config';
+import { getOutputChannelManager } from '../utils/outputChannel';
+import * as path from 'path';
+import { exec } from 'child_process';
+
+function findExecutablePath(programName: string): Promise<string | null> {
+    return new Promise((resolve) => {
+        const isWindows = process.platform === 'win32';
+        const cmd = isWindows ? `where ${programName}` : `which ${programName}`;
+        
+        exec(cmd, (error, stdout) => {
+            if (error || !stdout.trim()) {
+                resolve(null);
+                return;
+            }
+            const exePath = stdout.trim().split('\n')[0];
+            resolve(exePath);
+        });
+    });
+}
+
+function isAbsolutePath(p: string): boolean {
+    return path.isAbsolute(p);
+}
 
 export class LogTreeItem extends vscode.TreeItem {
     public logFile: LogFile | null;
@@ -193,9 +216,43 @@ export class LogTreeView {
 
         try {
             const localPath = await this.logMonitor.downloadLog(item.logFile, item.projectConfig);
-            const document = await vscode.workspace.openTextDocument(localPath);
-            await vscode.window.showTextDocument(document);
+            const config = getConfig();
+            const outputChannel = getOutputChannelManager().getRemoteTestChannel();
+            outputChannel.info(`[logViewer] 配置: ${config.logViewer}`);
+            
+            if (config.logViewer && config.logViewer.trim()) {
+                let viewer = config.logViewer.trim();
+                outputChannel.info(`[logViewer] 使用程序: ${viewer}`);
+                
+                if (!isAbsolutePath(viewer)) {
+                    const exePath = await findExecutablePath(viewer);
+                    if (exePath) {
+                        viewer = exePath;
+                        outputChannel.info(`[logViewer] 找到程序路径: ${viewer}`);
+                    } else {
+                        vscode.window.showErrorMessage(`找不到程序 "${viewer}"，请检查 logViewer 配置的程序路径是否正确。`);
+                        return;
+                    }
+                }
+                
+                const filePath = process.platform === 'win32' ? localPath : localPath.replace(/\\/g, '/');
+                outputChannel.info(`[logViewer] 打开文件: ${filePath}`);
+                
+                exec(`"${viewer}" "${filePath}"`, (error) => {
+                    if (error) {
+                        outputChannel.error(`[logViewer] 执行失败: ${error.message}`);
+                        vscode.window.showErrorMessage(`打开日志失败: ${error.message}。请检查 logViewer 配置的程序路径是否正确（程序名或完整路径）。`);
+                    } else {
+                        outputChannel.info(`[logViewer] 程序已启动`);
+                    }
+                });
+            } else {
+                const document = await vscode.workspace.openTextDocument(localPath);
+                await vscode.window.showTextDocument(document);
+            }
         } catch (error: any) {
+            const outputChannel = getOutputChannelManager().getRemoteTestChannel();
+            outputChannel.error(`[logViewer] 错误: ${error.message}`);
             vscode.window.showErrorMessage(`打开日志失败: ${error.message}`);
         }
     }

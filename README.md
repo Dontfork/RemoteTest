@@ -69,7 +69,8 @@
   ],
   "refreshInterval": 0,
   "useLogOutputChannel": true,
-  "textFileExtensions": []
+  "textFileExtensions": [],
+  "logViewer": ""
 }
 ```
 
@@ -97,10 +98,15 @@
 | `refreshInterval` | 日志刷新间隔（毫秒），0为禁用 | 5000 |
 | `useLogOutputChannel` | 测试输出通道类型 | true |
 | `textFileExtensions` | 额外文本文件扩展名（上传时作为文本处理） | [".txt", ".json"] |
+| `logViewer` | 自定义日志查看程序路径（为空时使用VSCode打开） | "notepad.exe" |
 
 > **提示**：
 > - `useLogOutputChannel`: true=LogOutputChannel（支持日志级别），false=OutputChannel
 > - `textFileExtensions`: 指定上传时作为文本处理的文件扩展名（转换换行符）
+> - `logViewer`: 自定义日志查看程序路径。日志文件通常较大不适合用VSCode打开，可配置为系统程序。配置时可以使用：
+>   - **程序名**（系统会从 PATH 环境变量中查找）：如 `notepad.exe`、`notepad++`、`code.exe` 等
+>   - **完整路径**：如 `C:\Program Files\Notepad++\notepad++.exe`
+>   为空时默认使用VSCode打开。
 
 ### 快捷命令配置
 
