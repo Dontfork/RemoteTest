@@ -78,14 +78,14 @@ export class FileUploader {
         }
 
         if (!project.commands || project.commands.length === 0) {
-            vscode.window.showWarningMessage('该工程未配置命令，无法运行用例');
+            vscode.window.setStatusBarMessage('该工程未配置命令，无法运行用例', 3000);
             return;
         }
 
         const availableCommands = project.commands.filter(cmd => cmd.runnable === true);
         
         if (availableCommands.length === 0) {
-            vscode.window.showWarningMessage('可用命令数量为 0，无法运行用例。请将需要运行的命令设置为 runnable: true。');
+            vscode.window.setStatusBarMessage('可用命令数量为 0，无法运行用例。请将需要运行的命令设置为 runnable: true。', 4000);
             return;
         }
 
@@ -104,13 +104,13 @@ export class FileUploader {
                     const files = this.getAllFiles(localPath);
                     
                     if (files.length === 0) {
-                        vscode.window.showWarningMessage(`目录 ${name} 中没有可上传的文件`);
+                        vscode.window.setStatusBarMessage(`目录 ${name} 中没有可上传的文件`, 3000);
                         return;
                     }
 
                     const command = await this.selectCommand(availableCommands);
                     if (!command) {
-                        vscode.window.showWarningMessage('已取消操作');
+                        vscode.window.setStatusBarMessage('已取消操作', 2000);
                         return;
                     }
 
@@ -123,17 +123,17 @@ export class FileUploader {
                         await this.runSingleTestCase(file, project, command);
                     }
                     
-                    vscode.window.showInformationMessage(`目录 ${name} 处理完成，共 ${files.length} 个文件`);
+                    vscode.window.setStatusBarMessage(`目录 ${name} 处理完成，共 ${files.length} 个文件`, 3000);
                 } else {
                     const command = await this.selectCommand(availableCommands);
                     if (!command) {
-                        vscode.window.showWarningMessage('已取消操作');
+                        vscode.window.setStatusBarMessage('已取消操作', 2000);
                         return;
                     }
 
                     progress.report({ message: `正在处理: ${name}` });
                     await this.runSingleTestCase(localPath, project, command);
-                    vscode.window.showInformationMessage(`文件 ${name} 运行完成`);
+                    vscode.window.setStatusBarMessage(`文件 ${name} 运行完成`, 3000);
                 }
             });
 
@@ -175,7 +175,7 @@ export class FileUploader {
                     const files = this.getAllFiles(localPath);
                     
                     if (files.length === 0) {
-                        vscode.window.showWarningMessage(`目录 ${name} 中没有可上传的文件`);
+                        vscode.window.setStatusBarMessage(`目录 ${name} 中没有可上传的文件`, 3000);
                         return;
                     }
 
@@ -188,11 +188,11 @@ export class FileUploader {
                         await this.runSingleTestCase(file, project, command);
                     }
                     
-                    vscode.window.showInformationMessage(`目录 ${name} 处理完成，共 ${files.length} 个文件`);
+                    vscode.window.setStatusBarMessage(`目录 ${name} 处理完成，共 ${files.length} 个文件`, 3000);
                 } else {
                     progress.report({ message: `正在处理: ${name}` });
                     await this.runSingleTestCase(localPath, project, command);
-                    vscode.window.showInformationMessage(`文件 ${name} 运行完成`);
+                    vscode.window.setStatusBarMessage(`文件 ${name} 运行完成`, 3000);
                 }
             });
 
@@ -215,7 +215,7 @@ export class FileUploader {
         command: CommandConfig
     ): Promise<void> {
         if (isExecuting()) {
-            vscode.window.showWarningMessage('当前有命令正在执行中，请等待执行完成后再试');
+            vscode.window.setStatusBarMessage('当前有命令正在执行中，请等待执行完成后再试', 3000);
             return;
         }
 
@@ -282,7 +282,7 @@ export class FileUploader {
                     const files = this.getAllFiles(localPath);
                     
                     if (files.length === 0) {
-                        vscode.window.showWarningMessage(`目录 ${name} 中没有可上传的文件`);
+                        vscode.window.setStatusBarMessage(`目录 ${name} 中没有可上传的文件`, 3000);
                         return;
                     }
 
@@ -302,7 +302,7 @@ export class FileUploader {
                         await scpClient.disconnect();
                     }
                     
-                    vscode.window.showInformationMessage(`目录 ${name} 上传完成，共 ${files.length} 个文件`);
+                    vscode.window.setStatusBarMessage(`目录 ${name} 上传完成，共 ${files.length} 个文件`, 3000);
                 } else {
                     progress.report({ message: `正在上传: ${name}` });
                     
@@ -314,7 +314,7 @@ export class FileUploader {
                         await scpClient.disconnect();
                     }
                     
-                    vscode.window.showInformationMessage(`文件 ${name} 上传完成`);
+                    vscode.window.setStatusBarMessage(`文件 ${name} 上传完成`, 3000);
                 }
             });
         } catch (error: any) {
@@ -376,7 +376,7 @@ export class FileUploader {
                         await scpClient.disconnect();
                     }
                     
-                    vscode.window.showInformationMessage(`目录 ${name} 同步完成`);
+                    vscode.window.setStatusBarMessage(`目录 ${name} 同步完成`, 3000);
                 } else {
                     progress.report({ message: `正在同步文件: ${name}` });
                     
@@ -387,7 +387,7 @@ export class FileUploader {
                         await scpClient.disconnect();
                     }
                     
-                    vscode.window.showInformationMessage(`文件 ${name} 同步完成`);
+                    vscode.window.setStatusBarMessage(`文件 ${name} 同步完成`, 3000);
                 }
             });
         } catch (error: any) {

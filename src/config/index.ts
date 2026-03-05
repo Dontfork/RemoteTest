@@ -5,9 +5,8 @@ import {
     RemoteTestConfig, 
     ProjectConfig, 
     CommandConfig,
-    LegacyRemoteTestConfig,
-    LegacyLogsConfig,
-    ProjectLogsConfig
+    ProjectLogsConfig,
+    ServerConfig
 } from '../types';
 import { validateConfig, fillMissingFields } from './validator';
 import { showValidationMessages, saveConfigWithDefaults } from './validatorUI';
@@ -107,82 +106,6 @@ function checkPathConflict(projects: ProjectConfig[]): { hasConflict: boolean; c
     return { hasConflict: conflicts.length > 0, conflicts };
 }
 
-function convertLegacyLogsConfig(legacyLogs: LegacyLogsConfig | undefined, projectName: string): ProjectLogsConfig {
-    const directories = (legacyLogs?.directories || []).map(dir => ({
-        name: dir.name,
-        path: dir.path
-    }));
-    
-    return {
-        directories,
-        downloadPath: legacyLogs?.downloadPath || ""
-    };
-}
-
-function convertLegacyConfig(legacy: LegacyRemoteTestConfig, workspacePath: string): RemoteTestConfig {
-    const projects: ProjectConfig[] = [];
-    
-    if (legacy.server) {
-        const defaultCommand: CommandConfig = {
-            name: "默认命令",
-            executeCommand: legacy.command?.executeCommand || "pytest {filePath} -v",
-            includePatterns: legacy.command?.filterPatterns || ["error", "failed", "FAILED", "Error", "ERROR"],
-            excludePatterns: []
-        };
-        
-        if (legacy.command?.filterMode === 'exclude') {
-            defaultCommand.includePatterns = [];
-            defaultCommand.excludePatterns = legacy.command?.filterPatterns || [];
-        }
-        
-        const project: ProjectConfig = {
-            name: "默认工程",
-            localPath: legacy.server.localProjectPath || workspacePath,
-            enabled: true,
-            server: {
-                host: legacy.server.host,
-                port: legacy.server.port,
-                username: legacy.server.username,
-                password: legacy.server.password,
-                privateKeyPath: legacy.server.privateKeyPath,
-                remoteDirectory: legacy.server.remoteDirectory
-            },
-            commands: [defaultCommand],
-            logs: convertLegacyLogsConfig(legacy.logs, "默认工程")
-        };
-        projects.push(project);
-    }
-    
-    if (legacy.projects && legacy.projects.length > 0) {
-        for (const project of legacy.projects as any[]) {
-            if (project.commands) {
-                for (const cmd of project.commands) {
-                    if (cmd.filterPatterns && !cmd.includePatterns && !cmd.excludePatterns) {
-                        if (cmd.filterMode === 'exclude') {
-                            cmd.excludePatterns = cmd.filterPatterns;
-                            cmd.includePatterns = [];
-                        } else {
-                            cmd.includePatterns = cmd.filterPatterns;
-                            cmd.excludePatterns = [];
-                        }
-                        delete cmd.filterPatterns;
-                        delete cmd.filterMode;
-                    }
-                }
-            }
-            
-            if (!project.logs && legacy.logs) {
-                project.logs = convertLegacyLogsConfig(legacy.logs, project.name);
-            }
-        }
-        projects.push(...legacy.projects);
-    }
-    
-    return {
-        projects
-    };
-}
-
 let config: RemoteTestConfig | null = null;
 let configFilePath: string = '';
 let fileWatcher: vscode.FileSystemWatcher | null = null;
@@ -240,7 +163,7 @@ export function loadConfig(workspacePath: string): RemoteTestConfig {
             }
             fs.writeFileSync(fullPath, JSON.stringify(defaultConfig, null, 4), 'utf-8');
             console.log('[RemoteTest] Default config created at:', fullPath);
-            vscode.window.showInformationMessage(`已创建默认配置文件: ${path.join('.vscode', configPath)}`);
+            vscode.window.setStatusBarMessage(`已创建默认配置文件: ${path.join('.vscode', configPath)}`, 3000);
             config = defaultConfig;
             return config as RemoteTestConfig;
         } else {
@@ -262,15 +185,6 @@ export function loadConfig(workspacePath: string): RemoteTestConfig {
                 for (const cmd of project.commands) {
                     if (!cmd.name) {
                         cmd.name = cmd.executeCommand.substring(0, 20);
-                    }
-                    if ((cmd as any).filterPatterns && !cmd.includePatterns && !cmd.excludePatterns) {
-                        if ((cmd as any).filterMode === 'exclude') {
-                            cmd.excludePatterns = (cmd as any).filterPatterns;
-                            cmd.includePatterns = [];
-                        } else {
-                            cmd.includePatterns = (cmd as any).filterPatterns;
-                            cmd.excludePatterns = [];
-                        }
                     }
                     if (!cmd.includePatterns) {
                         cmd.includePatterns = [];
@@ -308,8 +222,8 @@ export function loadConfig(workspacePath: string): RemoteTestConfig {
                 logViewer: finalConfig.logViewer ?? ""
             };
         } else {
-            config = convertLegacyConfig(loadedConfig, workspacePath);
-            vscode.window.showInformationMessage('已将旧版配置格式转换为新版多工程格式，建议更新配置文件');
+            vscode.window.showErrorMessage('配置文件格式错误：缺少 projects 数组，请检查配置文件格式');
+            config = defaultConfig;
         }
         
         return config as RemoteTestConfig;
@@ -461,7 +375,7 @@ export function setupConfigWatcher(context: vscode.ExtensionContext): void {
             return;
         }
         reloadConfig(workspacePath);
-        vscode.window.showInformationMessage('RemoteTest 配置已自动刷新');
+        vscode.window.setStatusBarMessage('RemoteTest 配置已自动刷新', 3000);
     });
 
     fileWatcher.onDidCreate((uri) => {
@@ -469,13 +383,13 @@ export function setupConfigWatcher(context: vscode.ExtensionContext): void {
             return;
         }
         reloadConfig(workspacePath);
-        vscode.window.showInformationMessage('RemoteTest 配置文件已创建并加载');
+        vscode.window.setStatusBarMessage('RemoteTest 配置文件已创建并加载', 3000);
     });
 
     fileWatcher.onDidDelete((uri) => {
         config = defaultConfig;
         configChangeEmitter.fire(defaultConfig);
-        vscode.window.showWarningMessage('RemoteTest 配置文件已删除，使用默认配置');
+        vscode.window.setStatusBarMessage('RemoteTest 配置文件已删除，使用默认配置', 3000);
     });
 
     context.subscriptions.push(fileWatcher);
@@ -491,6 +405,39 @@ export function dispose(): void {
         fileWatcher = null;
     }
     configChangeEmitter.dispose();
+}
+
+/**
+ * 获取第一个启用项目的服务器配置
+ * 
+ * 这是一个便捷方法，用于获取当前配置中第一个启用项目的服务器配置。
+ * 如果提供了serverConfig参数，则直接返回该配置。
+ * 
+ * @param serverConfig - 可选的服务器配置，如果提供则直接返回
+ * @returns 服务器配置对象
+ * @throws {Error} 当没有配置项目或没有启用的项目时抛出错误
+ * 
+ * @example
+ * ```typescript
+ * // 获取默认项目的服务器配置
+ * const serverConfig = getServerConfig();
+ * 
+ * // 使用自定义服务器配置
+ * const customConfig = { host: '192.168.1.100', ... };
+ * const config = getServerConfig(customConfig); // 返回 customConfig
+ * ```
+ */
+export function getServerConfig(serverConfig?: ServerConfig): ServerConfig {
+    if (serverConfig) {
+        return serverConfig;
+    }
+    
+    const config = getConfig();
+    if (config.projects && config.projects.length > 0 && config.projects[0].enabled !== false) {
+        return config.projects[0].server;
+    }
+    
+    throw new Error('未配置服务器信息');
 }
 
 export { defaultConfig, checkPathConflict };

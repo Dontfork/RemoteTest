@@ -165,7 +165,7 @@ export class ChangesTreeView {
 
     async uploadProjectChanges(item: ChangeTreeItem): Promise<void> {
         if (!item.changeGroup) {
-            vscode.window.showWarningMessage('请选择一个项目');
+            vscode.window.setStatusBarMessage('请选择一个项目', 3000);
             return;
         }
 
@@ -173,12 +173,12 @@ export class ChangesTreeView {
         const project = group.project;
         
         if (!hasValidLocalPath(project)) {
-            vscode.window.showWarningMessage(`工程 "${project.name}" 未配置 localPath，无法进行文件上传`);
+            vscode.window.setStatusBarMessage(`工程 "${project.name}" 未配置 localPath，无法进行文件上传`, 4000);
             return;
         }
         
         if (!hasValidRemoteDirectory(project)) {
-            vscode.window.showWarningMessage(`工程 "${project.name}" 未配置 remoteDirectory，无法进行文件上传`);
+            vscode.window.setStatusBarMessage(`工程 "${project.name}" 未配置 remoteDirectory，无法进行文件上传`, 4000);
             return;
         }
         
@@ -187,7 +187,7 @@ export class ChangesTreeView {
         const renamedChanges = group.changes.filter(c => c.type === 'renamed' || c.type === 'moved');
 
         if (uploadableChanges.length === 0 && deletedChanges.length === 0) {
-            vscode.window.showInformationMessage(`项目 ${group.projectName} 没有需要上传的变更文件`);
+            vscode.window.setStatusBarMessage(`项目 ${group.projectName} 没有需要上传的变更文件`, 3000);
             return;
         }
 
@@ -266,7 +266,7 @@ export class ChangesTreeView {
         });
 
         const summary = this.buildUploadSummary(uploadableChanges.length, deletedChanges.length, renamedChanges.length, shouldDeleteRemote);
-        vscode.window.showInformationMessage(summary);
+        vscode.window.setStatusBarMessage(summary, 4000);
         this.refresh();
     }
 
@@ -333,26 +333,26 @@ export class ChangesTreeView {
 
     async uploadSelectedChange(item: ChangeTreeItem): Promise<void> {
         if (!item.change) {
-            vscode.window.showWarningMessage('请选择一个变更文件');
+            vscode.window.setStatusBarMessage('请选择一个变更文件', 3000);
             return;
         }
 
         const project = item.change.project;
         
         if (!hasValidLocalPath(project)) {
-            vscode.window.showWarningMessage(`工程 "${project.name}" 未配置 localPath，无法进行文件上传`);
+            vscode.window.setStatusBarMessage(`工程 "${project.name}" 未配置 localPath，无法进行文件上传`, 4000);
             return;
         }
         
         if (!hasValidRemoteDirectory(project)) {
-            vscode.window.showWarningMessage(`工程 "${project.name}" 未配置 remoteDirectory，无法进行文件上传`);
+            vscode.window.setStatusBarMessage(`工程 "${project.name}" 未配置 remoteDirectory，无法进行文件上传`, 4000);
             return;
         }
 
         try {
             if (item.change.type === 'deleted') {
                 await this.deleteRemoteFile(item.change);
-                vscode.window.showInformationMessage(`已删除远程文件: ${item.change.relativePath}`);
+                vscode.window.setStatusBarMessage(`已删除远程文件: ${item.change.relativePath}`, 3000);
             } else {
                 await this.uploadSingleChange(item.change);
                 
@@ -372,10 +372,10 @@ export class ChangesTreeView {
                             type: 'deleted'
                         };
                         await this.deleteRemoteFile(oldChange);
-                        vscode.window.showInformationMessage(`已删除远程旧文件: ${item.change.oldRelativePath}`);
+                        vscode.window.setStatusBarMessage(`已删除远程旧文件: ${item.change.oldRelativePath}`, 3000);
                     }
                 } else {
-                    vscode.window.showInformationMessage(`文件 ${item.change.relativePath} 上传成功`);
+                    vscode.window.setStatusBarMessage(`文件 ${item.change.relativePath} 上传成功`, 3000);
                 }
             }
             

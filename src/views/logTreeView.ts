@@ -198,7 +198,7 @@ export class LogTreeView {
 
     async downloadLog(item: LogTreeItem): Promise<void> {
         if (!item.logFile || item.logFile.isDirectory) {
-            vscode.window.showWarningMessage('请选择一个日志文件进行下载');
+            vscode.window.setStatusBarMessage('请选择一个日志文件进行下载', 3000);
             return;
         }
 

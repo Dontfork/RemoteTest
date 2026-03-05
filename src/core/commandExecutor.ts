@@ -48,7 +48,7 @@ export class CommandExecutor {
 
     async execute(command: string, commandConfig?: Partial<CommandConfig>): Promise<string> {
         if (isExecuting()) {
-            vscode.window.showWarningMessage('当前有命令正在执行中，请等待执行完成后再试');
+            vscode.window.setStatusBarMessage('当前有命令正在执行中，请等待执行完成后再试', 3000);
             return '';
         }
         

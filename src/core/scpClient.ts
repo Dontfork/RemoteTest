@@ -2,9 +2,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import SftpClient from 'ssh2-sftp-client';
-import { getConfig } from '../config';
+import { getConfig, getServerConfig } from '../config';
 import { LogFile, ServerConfig } from '../types';
 import { ConnectionPool } from './connectionPool';
+import { createSSHAuthConfig } from '../utils/auth';
 
 const DEFAULT_TEXT_FILE_EXTENSIONS = [
     '.txt', '.md', '.json', '.xml', '.html', '.css', '.js', '.ts', '.jsx', '.tsx',
@@ -56,19 +57,8 @@ export class SCPClient {
         this.usePool = usePool;
     }
 
-    private getServerConfig(): ServerConfig {
-        if (this.serverConfig) {
-            return this.serverConfig;
-        }
-        const config = getConfig();
-        if (config.projects && config.projects.length > 0 && config.projects[0].enabled !== false) {
-            return config.projects[0].server;
-        }
-        throw new Error('未配置服务器信息');
-    }
-
     async connect(): Promise<SftpClient> {
-        const serverConfig = this.getServerConfig();
+        const serverConfig = getServerConfig(this.serverConfig || undefined);
 
         if (this.usePool) {
             return ConnectionPool.getInstance().getConnection(serverConfig);
@@ -85,13 +75,8 @@ export class SCPClient {
             readyTimeout: 30000
         };
 
-        if (serverConfig.privateKeyPath && fs.existsSync(serverConfig.privateKeyPath)) {
-            sftpConfig.privateKey = fs.readFileSync(serverConfig.privateKeyPath);
-        } else if (serverConfig.password) {
-            sftpConfig.password = serverConfig.password;
-        } else {
-            throw new Error('未配置 SSH 认证方式（密码或私钥）');
-        }
+        const authConfig = createSSHAuthConfig(serverConfig);
+        Object.assign(sftpConfig, authConfig);
 
         this.standaloneClient = new SftpClient();
         await this.standaloneClient.connect(sftpConfig);
@@ -114,7 +99,7 @@ export class SCPClient {
     }
 
     async uploadFile(localPath: string, remotePath?: string): Promise<string> {
-        const serverConfig = this.getServerConfig();
+        const serverConfig = getServerConfig(this.serverConfig || undefined);
         const sftp = await this.connect();
         const config = getConfig();
 

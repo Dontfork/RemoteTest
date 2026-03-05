@@ -109,12 +109,12 @@ export class QuickCommandsTreeView {
 
     async executeQuickCommand(item: QuickCommandItem): Promise<void> {
         if (!item.quickCommand) {
-            vscode.window.showWarningMessage('请选择一个命令');
+            vscode.window.setStatusBarMessage('请选择一个命令', 3000);
             return;
         }
 
         if (isExecuting()) {
-            vscode.window.showWarningMessage('当前有命令正在执行中，请等待执行完成后再试');
+            vscode.window.setStatusBarMessage('当前有命令正在执行中，请等待执行完成后再试', 3000);
             return;
         }
 
@@ -138,7 +138,9 @@ export class QuickCommandsTreeView {
                 );
             });
 
-            vscode.window.showInformationMessage(`命令 "${cmd.name}" 执行完成`);
+            setTimeout(() => {
+                vscode.window.setStatusBarMessage(`命令 "${cmd.name}" 执行完成`, 3000);
+            }, 100);
         } catch (error: any) {
             vscode.window.showErrorMessage(`命令执行失败: ${error.message}`);
         }

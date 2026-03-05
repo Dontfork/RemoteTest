@@ -50,7 +50,7 @@ export function activate(context: vscode.ExtensionContext) {
                     if (activeEditor) {
                         uri = activeEditor.document.uri;
                     } else {
-                        vscode.window.showWarningMessage('请先选择一个文件或目录');
+                        vscode.window.setStatusBarMessage('请先选择一个文件或目录', 3000);
                         return;
                     }
                 }
@@ -67,7 +67,7 @@ export function activate(context: vscode.ExtensionContext) {
                     if (activeEditor) {
                         uri = activeEditor.document.uri;
                     } else {
-                        vscode.window.showWarningMessage('请先选择一个文件或目录');
+                        vscode.window.setStatusBarMessage('请先选择一个文件或目录', 3000);
                         return;
                     }
                 }
@@ -84,7 +84,7 @@ export function activate(context: vscode.ExtensionContext) {
                     if (activeEditor) {
                         uri = activeEditor.document.uri;
                     } else {
-                        vscode.window.showWarningMessage('请先选择一个文件或目录');
+                        vscode.window.setStatusBarMessage('请先选择一个文件或目录', 3000);
                         return;
                     }
                 }
@@ -110,9 +110,9 @@ export function activate(context: vscode.ExtensionContext) {
             const wsPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
             if (wsPath) {
                 reloadConfig(wsPath);
-                vscode.window.showInformationMessage('RemoteTest 配置已刷新');
+                vscode.window.setStatusBarMessage('RemoteTest 配置已刷新', 3000);
             } else {
-                vscode.window.showWarningMessage('无法刷新配置：未找到工作区');
+                vscode.window.setStatusBarMessage('无法刷新配置：未找到工作区', 3000);
             }
         }),
 
@@ -136,7 +136,7 @@ export function activate(context: vscode.ExtensionContext) {
                     }
                 }
             } else {
-                vscode.window.showWarningMessage('无法打开配置文件：未找到工作区');
+                vscode.window.setStatusBarMessage('无法打开配置文件：未找到工作区', 3000);
             }
         }),
 
@@ -169,7 +169,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     logTreeView.start();
 
-    vscode.window.showInformationMessage('RemoteTest 插件已启动');
+    vscode.window.setStatusBarMessage('RemoteTest 插件已启动', 3000);
 }
 
 export function deactivate() {

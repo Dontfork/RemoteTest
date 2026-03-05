@@ -17,13 +17,12 @@ export interface UnifiedOutputChannel {
 export class OutputChannelManager {
     private static instance: OutputChannelManager;
     private remoteTestChannel: vscode.LogOutputChannel | null = null;
-    private testOutputChannel: vscode.LogOutputChannel | null = null;
-    private testOutputProxy: UnifiedOutputChannel | null = null;
+    private testOutputChannel: vscode.OutputChannel | null = null;
+    private currentIsLogChannel: boolean | null = null;
 
     private constructor() {
         onConfigChanged(() => {
-            this.testOutputChannel?.clear();
-            this.testOutputProxy = null;
+            this.recreateChannelIfNeeded();
         });
     }
 
@@ -38,34 +37,7 @@ export class OutputChannelManager {
         if (!this.remoteTestChannel) {
             this.remoteTestChannel = vscode.window.createOutputChannel('RemoteTest', { log: true });
         }
-        return this.createProxy(this.remoteTestChannel, true);
-    }
-
-    getTestOutputChannel(): UnifiedOutputChannel {
-        if (!this.testOutputChannel) {
-            this.testOutputChannel = vscode.window.createOutputChannel('TestOutput', { log: true });
-        }
-        if (!this.testOutputProxy) {
-            this.testOutputProxy = this.createProxy(this.testOutputChannel, getUseLogOutputChannel());
-        }
-        return this.testOutputProxy;
-    }
-
-    private createProxy(channel: vscode.LogOutputChannel, useLogLevel: boolean): UnifiedOutputChannel {
-        if (useLogLevel) {
-            return {
-                append: (v) => channel.append(v),
-                appendLine: (v) => channel.appendLine(v),
-                clear: () => channel.clear(),
-                show: (p) => channel.show(p),
-                hide: () => channel.hide(),
-                dispose: () => {},
-                info: (m) => channel.info(m),
-                warn: (m) => channel.warn(m),
-                error: (m) => channel.error(m),
-                trace: (m) => channel.trace(m)
-            };
-        }
+        const channel = this.remoteTestChannel;
         return {
             append: (v) => channel.append(v),
             appendLine: (v) => channel.appendLine(v),
@@ -73,11 +45,98 @@ export class OutputChannelManager {
             show: (p) => channel.show(p),
             hide: () => channel.hide(),
             dispose: () => {},
-            info: (m) => channel.appendLine(m),
-            warn: (m) => channel.appendLine(m),
-            error: (m) => channel.appendLine(m),
-            trace: (m) => channel.appendLine(m)
+            info: (m) => channel.info(m),
+            warn: (m) => channel.warn(m),
+            error: (m) => channel.error(m),
+            trace: (m) => channel.trace(m)
         };
+    }
+
+    getTestOutputChannel(): UnifiedOutputChannel {
+        return {
+            append: (v) => this.getChannel().append(v),
+            appendLine: (v) => this.getChannel().appendLine(v),
+            clear: () => this.getChannel().clear(),
+            show: (p) => this.getChannel().show(p),
+            hide: () => this.getChannel().hide(),
+            dispose: () => {},
+            info: (m) => this.logInfo(m),
+            warn: (m) => this.logWarn(m),
+            error: (m) => this.logError(m),
+            trace: (m) => this.logTrace(m)
+        };
+    }
+
+    private getChannel(): vscode.OutputChannel {
+        const useLog = getUseLogOutputChannel();
+        
+        if (this.currentIsLogChannel !== null && this.currentIsLogChannel !== useLog) {
+            this.testOutputChannel?.clear();
+            this.testOutputChannel?.dispose();
+            this.testOutputChannel = null;
+        }
+        
+        if (!this.testOutputChannel) {
+            if (useLog) {
+                this.testOutputChannel = vscode.window.createOutputChannel('TestOutput', { log: true });
+            } else {
+                this.testOutputChannel = vscode.window.createOutputChannel('TestOutput');
+            }
+            this.currentIsLogChannel = useLog;
+        }
+        
+        return this.testOutputChannel;
+    }
+
+    private recreateChannelIfNeeded(): void {
+        const useLog = getUseLogOutputChannel();
+        
+        if (this.currentIsLogChannel !== null && this.currentIsLogChannel !== useLog) {
+            this.testOutputChannel?.clear();
+            this.testOutputChannel?.dispose();
+            this.testOutputChannel = null;
+            this.currentIsLogChannel = useLog;
+        }
+        
+        if (this.testOutputChannel) {
+            this.testOutputChannel.clear();
+        }
+    }
+
+    private logInfo(m: string): void {
+        const channel = this.getChannel();
+        if (this.currentIsLogChannel && 'info' in channel) {
+            (channel as vscode.LogOutputChannel).info(m);
+        } else {
+            channel.appendLine(m);
+        }
+    }
+
+    private logWarn(m: string): void {
+        const channel = this.getChannel();
+        if (this.currentIsLogChannel && 'warn' in channel) {
+            (channel as vscode.LogOutputChannel).warn(m);
+        } else {
+            channel.appendLine(m);
+        }
+    }
+
+    private logError(m: string): void {
+        const channel = this.getChannel();
+        if (this.currentIsLogChannel && 'error' in channel) {
+            (channel as vscode.LogOutputChannel).error(m);
+        } else {
+            channel.appendLine(m);
+        }
+    }
+
+    private logTrace(m: string): void {
+        const channel = this.getChannel();
+        if (this.currentIsLogChannel && 'trace' in channel) {
+            (channel as vscode.LogOutputChannel).trace(m);
+        } else {
+            channel.appendLine(m);
+        }
     }
 
     dispose(): void {
@@ -85,7 +144,7 @@ export class OutputChannelManager {
         this.remoteTestChannel = null;
         this.testOutputChannel?.dispose();
         this.testOutputChannel = null;
-        this.testOutputProxy = null;
+        this.currentIsLogChannel = null;
     }
 }
 

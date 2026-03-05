@@ -1,6 +1,6 @@
-import * as fs from 'fs';
 import SftpClient from 'ssh2-sftp-client';
 import { ServerConfig } from '../types';
+import { createSSHAuthConfig } from '../utils/auth';
 
 interface PooledConnection {
     client: SftpClient;
@@ -39,13 +39,8 @@ export class ConnectionPool {
             readyTimeout: 30000
         };
 
-        if (serverConfig.privateKeyPath && fs.existsSync(serverConfig.privateKeyPath)) {
-            sftpConfig.privateKey = fs.readFileSync(serverConfig.privateKeyPath);
-        } else if (serverConfig.password) {
-            sftpConfig.password = serverConfig.password;
-        } else {
-            throw new Error('未配置 SSH 认证方式（密码或私钥）');
-        }
+        const authConfig = createSSHAuthConfig(serverConfig);
+        Object.assign(sftpConfig, authConfig);
 
         return sftpConfig;
     }

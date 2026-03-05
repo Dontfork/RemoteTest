@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { getConfig, getEnabledProjects, getAllLogDirectories, getRefreshInterval } from '../config';
+import { getConfig, getEnabledProjects, getAllLogDirectories, getRefreshInterval, getServerConfig } from '../config';
 import { SCPClient } from './scpClient';
 import { ConnectionPool } from './connectionPool';
 import { LogFile, LogDirectoryConfig, ProjectConfig, ServerConfig } from '../types';
@@ -39,20 +39,9 @@ export class LogMonitor {
         return this.loadErrors.get(dirPath) || null;
     }
 
-    private getServerConfig(project: ProjectConfig | null): ServerConfig {
-        if (project) {
-            return project.server;
-        }
-        const config = getConfig();
-        if (config.projects && config.projects.length > 0 && config.projects[0].enabled !== false) {
-            return config.projects[0].server;
-        }
-        throw new Error('未配置服务器信息');
-    }
-
     async fetchDirectoryContents(dirPath: string, project: ProjectConfig | null = null): Promise<{ files: LogFile[]; error: string | null }> {
         try {
-            const serverConfig = this.getServerConfig(project);
+            const serverConfig = getServerConfig(project?.server);
             const scpClient = new SCPClient(serverConfig, true);
             try {
                 const items = await scpClient.listDirectory(dirPath);
@@ -83,7 +72,7 @@ export class LogMonitor {
         const dirsByServer = new Map<string, Array<{ dir: LogDirectoryConfig; project: ProjectConfig | null }>>();
 
         for (const item of allDirs) {
-            const serverConfig = this.getServerConfig(item.project);
+            const serverConfig = getServerConfig(item.project?.server);
             const serverKey = `${serverConfig.host}:${serverConfig.port}:${serverConfig.username}`;
             
             if (!dirsByServer.has(serverKey)) {
@@ -100,7 +89,7 @@ export class LogMonitor {
         for (const [serverKey, dirs] of dirsByServer) {
             if (dirs.length === 0) continue;
 
-            const serverConfig = this.getServerConfig(dirs[0].project);
+            const serverConfig = getServerConfig(dirs[0].project?.server);
             const scpClient = new SCPClient(serverConfig, true);
 
             try {
@@ -195,7 +184,7 @@ export class LogMonitor {
         const localPath = path.join(downloadPath, logFile.name);
 
         try {
-            const serverConfig = this.getServerConfig(project);
+            const serverConfig = getServerConfig(project?.server);
             const scpClient = new SCPClient(serverConfig, true);
             await scpClient.downloadFile(logFile.path, localPath);
             await scpClient.disconnect();
@@ -213,7 +202,7 @@ export class LogMonitor {
         }, async (progress) => {
             progress.report({ message: `正在下载 ${logFile.name}...` });
             const localPath = await this.downloadLog(logFile, project);
-            vscode.window.showInformationMessage(`日志已下载到: ${localPath}`);
+            vscode.window.setStatusBarMessage(`日志已下载到: ${localPath}`, 3000);
             return localPath;
         });
     }

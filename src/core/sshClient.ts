@@ -1,7 +1,6 @@
-import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { Client, ConnectConfig } from 'ssh2';
-import { getConfig } from '../config';
+import { getConfig, getServerConfig } from '../config';
 import { ServerConfig, CommandConfig } from '../types';
 import { 
     filterCommandOutput, 
@@ -9,6 +8,7 @@ import {
     matchPattern
 } from '../utils/outputFilter';
 import { UnifiedOutputChannel } from '../utils/outputChannel';
+import { createSSHAuthConfig } from '../utils/auth';
 
 let isCommandExecuting = false;
 
@@ -56,23 +56,12 @@ export class SSHClient {
         this.serverConfig = serverConfig || null;
     }
 
-    private getServerConfig(): ServerConfig {
-        if (this.serverConfig) {
-            return this.serverConfig;
-        }
-        const config = getConfig();
-        if (config.projects && config.projects.length > 0 && config.projects[0].enabled !== false) {
-            return config.projects[0].server;
-        }
-        throw new Error('未配置服务器信息');
-    }
-
     async connect(): Promise<Client> {
         if (this.client && this.connected) {
             return this.client;
         }
 
-        const serverConfig = this.getServerConfig();
+        const serverConfig = getServerConfig(this.serverConfig || undefined);
         const sshConfig: ConnectConfig = {
             host: serverConfig.host,
             port: serverConfig.port,
@@ -80,13 +69,8 @@ export class SSHClient {
             readyTimeout: 30000
         };
 
-        if (serverConfig.privateKeyPath && fs.existsSync(serverConfig.privateKeyPath)) {
-            sshConfig.privateKey = fs.readFileSync(serverConfig.privateKeyPath);
-        } else if (serverConfig.password) {
-            sshConfig.password = serverConfig.password;
-        } else {
-            throw new Error('未配置 SSH 认证方式（密码或私钥）');
-        }
+        const authConfig = createSSHAuthConfig(serverConfig);
+        Object.assign(sshConfig, authConfig);
 
         return new Promise((resolve, reject) => {
             this.client = new Client();
