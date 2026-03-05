@@ -1324,4 +1324,109 @@ describe('GitChangeDetector Module - Git变更检测模块测试', () => {
             assert.ok(!displayPath.includes('\\'));
         });
     });
+
+    describe('Git Status 解析边界情况 - 各种格式兼容', () => {
+        it('解析 M file.txt - 单空格分隔', () => {
+            const line = 'M file.txt';
+            const result = parseGitStatusLineNew(line);
+            
+            assert.strictEqual(result.filePath, 'file.txt');
+        });
+
+        it('解析 M ABC/EF.txt - 目录文件', () => {
+            const line = 'M ABC/EF.txt';
+            const result = parseGitStatusLineNew(line);
+            
+            assert.strictEqual(result.filePath, 'ABC/EF.txt');
+        });
+
+        it('解析  M file.txt - 有前导空格', () => {
+            const line = ' M file.txt';
+            const result = parseGitStatusLineNew(line);
+            
+            assert.strictEqual(result.filePath, 'file.txt');
+        });
+
+        it('解析 MM file.txt - 双重修改', () => {
+            const line = 'MM file.txt';
+            const result = parseGitStatusLineNew(line);
+            
+            assert.strictEqual(result.filePath, 'file.txt');
+        });
+
+        it('解析 A newfile.txt - 新增文件', () => {
+            const line = 'A newfile.txt';
+            const result = parseGitStatusLineNew(line);
+            
+            assert.strictEqual(result.filePath, 'newfile.txt');
+        });
+
+        it('解析 D deleted.txt - 删除文件', () => {
+            const line = 'D deleted.txt';
+            const result = parseGitStatusLineNew(line);
+            
+            assert.strictEqual(result.filePath, 'deleted.txt');
+        });
+
+        it('解析 R  old.txt -> new.txt - 重命名', () => {
+            const line = 'R  old.txt -> new.txt';
+            const result = parseGitStatusLineNew(line);
+            
+            assert.strictEqual(result.filePath, 'new.txt');
+            assert.strictEqual(result.oldFilePath, 'old.txt');
+        });
+
+        it('解析 ?? untracked.txt - 未跟踪文件', () => {
+            const line = '?? untracked.txt';
+            const result = parseGitStatusLineNew(line);
+            
+            assert.strictEqual(result.filePath, 'untracked.txt');
+        });
+
+        function parseGitStatusLineNew(line: string): { filePath: string; oldFilePath: string | undefined } {
+            if (line.length < 3) {
+                return { filePath: '', oldFilePath: undefined };
+            }
+
+            let filePath = line.substring(2).trim();
+            
+            if (!filePath) {
+                return { filePath: '', oldFilePath: undefined };
+            }
+
+            let oldFilePath: string | undefined;
+
+            if (filePath.startsWith('"') && filePath.endsWith('"')) {
+                filePath = filePath.slice(1, -1);
+            }
+
+            if (filePath.includes(' -> ')) {
+                const parts = filePath.split(' -> ');
+                oldFilePath = parts[0];
+                filePath = parts[1];
+                
+                if (oldFilePath && oldFilePath.startsWith('"') && oldFilePath.endsWith('"')) {
+                    oldFilePath = oldFilePath.slice(1, -1);
+                }
+                if (filePath && filePath.startsWith('"') && filePath.endsWith('"')) {
+                    filePath = filePath.slice(1, -1);
+                }
+                
+                if (!filePath) {
+                    return { filePath: '', oldFilePath: undefined };
+                }
+            } else {
+                const spaceIndex = filePath.indexOf(' ');
+                if (spaceIndex > 0) {
+                    filePath = filePath.substring(spaceIndex + 1).trim();
+                }
+                
+                if (!filePath) {
+                    return { filePath: '', oldFilePath: undefined };
+                }
+            }
+
+            return { filePath, oldFilePath };
+        }
+    });
 });

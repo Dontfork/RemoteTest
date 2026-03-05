@@ -287,13 +287,19 @@ export class GitChangeDetector {
     }
 
     private parseGitStatusLineToRaw(line: string): RawGitChange | null {
-        if (line.length < 4) {
+        if (line.length < 3) {
             return null;
         }
 
         const xStatus = line[0];
         const yStatus = line[1];
-        let filePath = line.substring(3).trim();
+        
+        let filePath = line.substring(2).trim();
+        
+        if (!filePath) {
+            return null;
+        }
+
         let oldFilePath: string | undefined;
 
         if (filePath.startsWith('"') && filePath.endsWith('"')) {
@@ -307,6 +313,23 @@ export class GitChangeDetector {
             
             if (oldFilePath.startsWith('"') && oldFilePath.endsWith('"')) {
                 oldFilePath = oldFilePath.slice(1, -1);
+            }
+            
+            if (filePath.startsWith('"') && filePath.endsWith('"')) {
+                filePath = filePath.slice(1, -1);
+            }
+            
+            if (!filePath) {
+                return null;
+            }
+        } else {
+            const spaceIndex = filePath.indexOf(' ');
+            if (spaceIndex > 0) {
+                filePath = filePath.substring(spaceIndex + 1).trim();
+            }
+            
+            if (!filePath) {
+                return null;
             }
         }
 
