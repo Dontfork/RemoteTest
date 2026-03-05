@@ -18,9 +18,13 @@ export class OutputChannelManager {
     private static instance: OutputChannelManager;
     private remoteTestChannel: vscode.LogOutputChannel | null = null;
     private testOutputChannel: vscode.LogOutputChannel | null = null;
+    private testOutputProxy: UnifiedOutputChannel | null = null;
 
     private constructor() {
-        onConfigChanged(() => this.testOutputChannel?.clear());
+        onConfigChanged(() => {
+            this.testOutputChannel?.clear();
+            this.testOutputProxy = null;
+        });
     }
 
     static getInstance(): OutputChannelManager {
@@ -41,7 +45,10 @@ export class OutputChannelManager {
         if (!this.testOutputChannel) {
             this.testOutputChannel = vscode.window.createOutputChannel('TestOutput', { log: true });
         }
-        return this.createProxy(this.testOutputChannel, getUseLogOutputChannel());
+        if (!this.testOutputProxy) {
+            this.testOutputProxy = this.createProxy(this.testOutputChannel, getUseLogOutputChannel());
+        }
+        return this.testOutputProxy;
     }
 
     private createProxy(channel: vscode.LogOutputChannel, useLogLevel: boolean): UnifiedOutputChannel {
@@ -78,6 +85,7 @@ export class OutputChannelManager {
         this.remoteTestChannel = null;
         this.testOutputChannel?.dispose();
         this.testOutputChannel = null;
+        this.testOutputProxy = null;
     }
 }
 

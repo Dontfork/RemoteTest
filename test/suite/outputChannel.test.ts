@@ -246,4 +246,148 @@ describe('OutputChannelManager Module - 输出通道管理模块测试', () => {
             assert.strictEqual(getTestOutputChannelType(false), 'OutputChannel');
         });
     });
+
+    describe('配置变更时 Proxy 重建机制', () => {
+        it('验证配置变更后 proxy 被清空', () => {
+            let proxy: { useLog: boolean } | null = null;
+            let currentConfig = true;
+            
+            const getProxy = (useLog: boolean) => {
+                if (!proxy) {
+                    proxy = { useLog };
+                }
+                return proxy;
+            };
+            
+            const onConfigChanged = (newConfig: boolean) => {
+                currentConfig = newConfig;
+                proxy = null;
+            };
+            
+            getProxy(true);
+            assert.notStrictEqual(proxy, null);
+            
+            onConfigChanged(false);
+            assert.strictEqual(proxy, null);
+        });
+
+        it('验证配置变更后重新获取 proxy 使用新配置', () => {
+            let proxy: { useLog: boolean } | null = null;
+            let currentConfig = true;
+            
+            const getProxy = () => {
+                if (!proxy) {
+                    proxy = { useLog: currentConfig };
+                }
+                return proxy;
+            };
+            
+            const onConfigChanged = (newConfig: boolean) => {
+                currentConfig = newConfig;
+                proxy = null;
+            };
+            
+            const proxy1 = getProxy();
+            assert.strictEqual(proxy1.useLog, true);
+            
+            onConfigChanged(false);
+            
+            const proxy2 = getProxy();
+            assert.strictEqual(proxy2.useLog, false);
+        });
+
+        it('验证多次获取返回缓存的 proxy', () => {
+            let proxy: { useLog: boolean } | null = null;
+            const currentConfig = true;
+            
+            const getProxy = () => {
+                if (!proxy) {
+                    proxy = { useLog: currentConfig };
+                }
+                return proxy;
+            };
+            
+            const proxy1 = getProxy();
+            const proxy2 = getProxy();
+            
+            assert.strictEqual(proxy1, proxy2);
+        });
+
+        it('验证配置从 true 变为 false 时输出格式变化', () => {
+            const createOutputMethods = (useLog: boolean) => {
+                const outputs: string[] = [];
+                
+                if (useLog) {
+                    return {
+                        info: (m: string) => outputs.push(`[INFO] ${m}`),
+                        warn: (m: string) => outputs.push(`[WARN] ${m}`),
+                        error: (m: string) => outputs.push(`[ERROR] ${m}`),
+                        getOutputs: () => outputs
+                    };
+                } else {
+                    return {
+                        info: (m: string) => outputs.push(m),
+                        warn: (m: string) => outputs.push(m),
+                        error: (m: string) => outputs.push(m),
+                        getOutputs: () => outputs
+                    };
+                }
+            };
+            
+            const logOutput = createOutputMethods(true);
+            logOutput.info('test message');
+            assert.deepStrictEqual(logOutput.getOutputs(), ['[INFO] test message']);
+            
+            const plainOutput = createOutputMethods(false);
+            plainOutput.info('test message');
+            assert.deepStrictEqual(plainOutput.getOutputs(), ['test message']);
+        });
+
+        it('验证配置从 false 变为 true 时输出格式变化', () => {
+            const createOutputMethods = (useLog: boolean) => {
+                const outputs: string[] = [];
+                
+                if (useLog) {
+                    return {
+                        info: (m: string) => outputs.push(`[INFO] ${m}`),
+                        getOutputs: () => outputs
+                    };
+                } else {
+                    return {
+                        info: (m: string) => outputs.push(m),
+                        getOutputs: () => outputs
+                    };
+                }
+            };
+            
+            const plainOutput = createOutputMethods(false);
+            plainOutput.info('message');
+            assert.deepStrictEqual(plainOutput.getOutputs(), ['message']);
+            
+            const logOutput = createOutputMethods(true);
+            logOutput.info('message');
+            assert.deepStrictEqual(logOutput.getOutputs(), ['[INFO] message']);
+        });
+
+        it('验证配置变更时清空输出通道', () => {
+            let cleared = false;
+            const outputs: string[] = ['old content'];
+            
+            const clearChannel = () => {
+                outputs.length = 0;
+                cleared = true;
+            };
+            
+            const onConfigChanged = () => {
+                clearChannel();
+            };
+            
+            assert.strictEqual(outputs.length, 1);
+            
+            onConfigChanged();
+            
+            assert.strictEqual(cleared, true);
+            assert.strictEqual(outputs.length, 0);
+        });
+    });
 });

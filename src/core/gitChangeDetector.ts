@@ -70,15 +70,31 @@ export class GitChangeDetector {
 
     private async getProjectChanges(project: ProjectConfig, localPath: string): Promise<GitChange[]> {
         try {
-            const { stdout: statusOutput } = await execAsync(
-                'git -c core.quotepath=false status -M --porcelain -uall',
-                { 
-                    cwd: localPath, 
-                    maxBuffer: 1024 * 1024 * 10,
-                    encoding: 'utf8',
-                    env: { ...process.env, LANG: 'C.UTF-8' }
-                }
-            );
+            let statusOutput = '';
+            
+            try {
+                const result = await execAsync(
+                    'git -c core.quotepath=false status -M --porcelain -uall',
+                    { 
+                        cwd: localPath, 
+                        maxBuffer: 1024 * 1024 * 10,
+                        encoding: 'utf8',
+                        env: { ...process.env, LANG: 'C.UTF-8' }
+                    }
+                );
+                statusOutput = result.stdout;
+            } catch {
+                const fallbackResult = await execAsync(
+                    'git -c core.quotepath=false status -M --porcelain -u',
+                    { 
+                        cwd: localPath, 
+                        maxBuffer: 1024 * 1024 * 10,
+                        encoding: 'utf8',
+                        env: { ...process.env, LANG: 'C.UTF-8' }
+                    }
+                );
+                statusOutput = fallbackResult.stdout;
+            }
 
             if (!statusOutput.trim()) {
                 return [];
@@ -294,7 +310,13 @@ export class GitChangeDetector {
         const xStatus = line[0];
         const yStatus = line[1];
         
-        let filePath = line.substring(2).trim();
+        let filePath: string;
+        
+        if (line[2] === ' ') {
+            filePath = line.substring(3).trim();
+        } else {
+            filePath = line.substring(2).trim();
+        }
         
         if (!filePath) {
             return null;
@@ -317,15 +339,6 @@ export class GitChangeDetector {
             
             if (filePath.startsWith('"') && filePath.endsWith('"')) {
                 filePath = filePath.slice(1, -1);
-            }
-            
-            if (!filePath) {
-                return null;
-            }
-        } else {
-            const spaceIndex = filePath.indexOf(' ');
-            if (spaceIndex > 0) {
-                filePath = filePath.substring(spaceIndex + 1).trim();
             }
             
             if (!filePath) {

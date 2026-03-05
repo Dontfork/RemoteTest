@@ -1,12 +1,6 @@
 import * as assert from 'assert';
 import { describe, it } from 'mocha';
-
-const defaultConfig = {
-    projects: [],
-    refreshInterval: 0,
-    useLogOutputChannel: true,
-    textFileExtensions: []
-};
+import { defaultConfig } from '../../src/config/index';
 
 describe('Config Module - 配置模块测试', () => {
     describe('Default Configuration - 默认配置验证', () => {
