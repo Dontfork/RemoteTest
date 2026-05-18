@@ -15,6 +15,31 @@ export function isExecuting(): boolean {
     return isCommandExecuting;
 }
 
+export function formatError(error: unknown): string {
+    if (error instanceof Error) {
+        return error.message || error.toString();
+    }
+    if (typeof error === 'string') {
+        return error;
+    }
+    try {
+        return JSON.stringify(error);
+    } catch {
+        return String(error);
+    }
+}
+
+export function fullErrorMessage(error: unknown): string {
+    if (error instanceof Error) {
+        const parts: string[] = [error.message || error.toString()];
+        if (error.stack) {
+            parts.push(`\n--- 堆栈 ---\n${error.stack}`);
+        }
+        return parts.join('');
+    }
+    return formatError(error);
+}
+
 function getLogLevel(line: string): 'info' | 'warn' | 'error' | 'trace' {
     const lowerLine = line.toLowerCase();
     if (lowerLine.includes('[error]') || lowerLine.includes('[err]') || 
@@ -50,6 +75,7 @@ export class SSHClient {
     private client: Client | null = null;
     private connected: boolean = false;
     private serverConfig: ServerConfig | null = null;
+    private connectPromise: Promise<Client> | null = null;
 
     constructor(serverConfig?: ServerConfig) {
         this.serverConfig = serverConfig || null;
@@ -60,38 +86,59 @@ export class SSHClient {
             return this.client;
         }
 
+        if (this.connectPromise) {
+            return this.connectPromise;
+        }
+
         if (!this.serverConfig) {
             throw new Error('未指定服务器配置，无法建立 SSH 连接');
         }
-        const serverConfig = this.serverConfig;
+
+        this.connectPromise = this.doConnect();
+
+        try {
+            const client = await this.connectPromise;
+            return client;
+        } finally {
+            this.connectPromise = null;
+        }
+    }
+
+    private async doConnect(): Promise<Client> {
+        const serverConfig = this.serverConfig!;
         const sshConfig: ConnectConfig = {
             host: serverConfig.host,
             port: serverConfig.port,
             username: serverConfig.username,
-            readyTimeout: 30000
+            readyTimeout: 30000,
+            keepaliveInterval: 30000,
+            keepaliveCountMax: 3
         };
 
         const authConfig = createSSHAuthConfig(serverConfig);
         Object.assign(sshConfig, authConfig);
 
         return new Promise((resolve, reject) => {
-            this.client = new Client();
+            const newClient = new Client();
             
-            this.client.on('ready', () => {
+            newClient.on('ready', () => {
+                this.client = newClient;
                 this.connected = true;
-                resolve(this.client!);
+                resolve(newClient);
             });
 
-            this.client.on('error', (err) => {
+            newClient.on('error', (err) => {
                 this.connected = false;
+                this.client = null;
                 reject(new Error(`SSH 连接失败: ${err.message}`));
             });
 
-            this.client.on('close', () => {
+            newClient.on('close', () => {
                 this.connected = false;
+                this.client = null;
             });
 
-            this.client.connect(sshConfig);
+            newClient.connect(sshConfig);
         });
     }
 
@@ -117,6 +164,18 @@ export interface ExecuteResult {
     stderr: string;
     code: number;
     filteredOutput: string;
+}
+
+const COMMAND_TIMEOUT_MS = 5 * 60 * 1000;
+
+let commandTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
+
+function clearCommandLock(): void {
+    isCommandExecuting = false;
+    if (commandTimeoutHandle) {
+        clearTimeout(commandTimeoutHandle);
+        commandTimeoutHandle = null;
+    }
 }
 
 export async function executeRemoteCommand(
@@ -147,6 +206,26 @@ export async function executeRemoteCommand(
             let stdout = '';
             let stderr = '';
             let exitCode = 0;
+            let settled = false;
+
+            const settle = (fn: () => void) => {
+                if (!settled) {
+                    settled = true;
+                    clearCommandLock();
+                    fn();
+                }
+            };
+
+            commandTimeoutHandle = setTimeout(() => {
+                settle(() => {
+                    if (outputChannel) {
+                        outputChannel.error('└─ 命令执行超时 (5分钟) — 已强制终止');
+                        outputChannel.show();
+                    }
+                    sshClient.disconnect();
+                    reject(new Error(`命令执行超时 (${COMMAND_TIMEOUT_MS / 1000}秒): ${command}`));
+                });
+            }, COMMAND_TIMEOUT_MS);
 
             const fullCommand = finalServerConfig.remoteDirectory 
                 ? `cd ${finalServerConfig.remoteDirectory} && ${command}`
@@ -166,30 +245,46 @@ export async function executeRemoteCommand(
 
             client.exec(fullCommand, (err, stream) => {
                 if (err) {
-                    isCommandExecuting = false;
-                    reject(new Error(`命令执行失败: ${err.message}`));
+                    settle(() => {
+                        reject(new Error(`命令执行失败: ${err.message}`));
+                    });
                     return;
                 }
 
                 stream.on('close', (code: number, signal: string) => {
                     exitCode = code;
-                    isCommandExecuting = false;
                     
-                    if (outputChannel) {
-                        if (code === 0) {
-                            outputChannel.info(`└─ 完成 (退出码: ${code}) ${'─'.repeat(42)}`);
-                        } else {
-                            outputChannel.error(`└─ 完成 (退出码: ${code}) ${'─'.repeat(42)}`);
+                    settle(() => {
+                        if (outputChannel) {
+                            if (code === 0) {
+                                outputChannel.info(`└─ 完成 (退出码: ${code}) ${'─'.repeat(42)}`);
+                            } else {
+                                outputChannel.error(`└─ 完成 (退出码: ${code}) ${'─'.repeat(42)}`);
+                            }
+                            outputChannel.show();
                         }
-                        outputChannel.show();
-                    }
-                    
-                    const combinedOutput = stdout + stderr;
-                    const cleanOutput = stripAnsiEscapeCodes(combinedOutput);
-                    const filteredOutput = filterCommandOutput(cleanOutput, includePatterns, excludePatterns);
-                    
-                    resolve({ stdout, stderr, code: exitCode, filteredOutput });
-                    sshClient.disconnect();
+                        
+                        const combinedOutput = stdout + stderr;
+                        const cleanOutput = stripAnsiEscapeCodes(combinedOutput);
+                        const filteredOutput = filterCommandOutput(cleanOutput, includePatterns, excludePatterns);
+                        
+                        resolve({ stdout, stderr, code: exitCode, filteredOutput });
+                        sshClient.disconnect();
+                    });
+                });
+
+                stream.on('error', (streamErr: Error) => {
+                    settle(() => {
+                        if (outputChannel) {
+                            outputChannel.error(`└─ 流错误: ${streamErr.message}`);
+                            outputChannel.show();
+                        }
+                        const combinedOutput = stdout + stderr;
+                        const cleanOutput = stripAnsiEscapeCodes(combinedOutput);
+                        const filteredOutput = filterCommandOutput(cleanOutput, includePatterns, excludePatterns);
+                        resolve({ stdout, stderr, code: -1, filteredOutput });
+                        sshClient.disconnect();
+                    });
                 });
 
                 stream.on('data', (data: Buffer) => {
@@ -251,7 +346,7 @@ export async function executeRemoteCommand(
             });
         });
     } catch (error) {
-        isCommandExecuting = false;
+        clearCommandLock();
         await sshClient.disconnect();
         throw error;
     }

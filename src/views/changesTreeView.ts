@@ -6,6 +6,35 @@ import { GitChange, GitChangeType, CommitChangeGroup, CommitFileChange, ProjectC
 import { FileUploader } from '../core/uploader';
 import { SCPClient } from '../core/scpClient';
 import { hasValidRemoteDirectory, hasValidLocalPath } from '../config';
+import { formatError } from '../core/sshClient';
+
+function getChangeTypeLabel(type: GitChangeType): string {
+    switch (type) {
+        case 'added': return '新增';
+        case 'modified': return '修改';
+        case 'deleted': return '删除';
+        case 'renamed': return '重命名';
+        case 'moved': return '移动';
+        default: return '未知';
+    }
+}
+
+function getIconForChangeType(type: GitChangeType): vscode.ThemeIcon {
+    switch (type) {
+        case 'added':
+            return new vscode.ThemeIcon('add', new vscode.ThemeColor('gitDecoration.addedResourceForeground'));
+        case 'modified':
+            return new vscode.ThemeIcon('edit', new vscode.ThemeColor('gitDecoration.modifiedResourceForeground'));
+        case 'deleted':
+            return new vscode.ThemeIcon('trash', new vscode.ThemeColor('gitDecoration.deletedResourceForeground'));
+        case 'renamed':
+            return new vscode.ThemeIcon('arrow-right', new vscode.ThemeColor('gitDecoration.renamedResourceForeground'));
+        case 'moved':
+            return new vscode.ThemeIcon('arrow-swap', new vscode.ThemeColor('gitDecoration.renamedResourceForeground'));
+        default:
+            return new vscode.ThemeIcon('file');
+    }
+}
 
 export class ChangeTreeItem extends vscode.TreeItem {
     public change: GitChange | null;
@@ -13,8 +42,8 @@ export class ChangeTreeItem extends vscode.TreeItem {
     public commitGroup: CommitChangeGroup | null;
     public commitFileChange: CommitFileChange | null;
 
-    constructor(item: GitChange | ProjectChangeData | CommitChangeGroup | CommitFileChange, itemType: 'project' | 'uncommitted' | 'commit' | 'commitFile') {
-        super('', vscode.TreeItemCollapsibleState.Collapsed);
+    constructor(item: GitChange | ProjectChangeData | CommitChangeGroup | CommitFileChange | string, itemType: 'project' | 'uncommitted' | 'commit' | 'commitFile' | 'message') {
+        super('', itemType === 'message' ? vscode.TreeItemCollapsibleState.None : vscode.TreeItemCollapsibleState.Collapsed);
 
         this.change = null;
         this.changeGroup = null;
@@ -34,7 +63,16 @@ export class ChangeTreeItem extends vscode.TreeItem {
             case 'commitFile':
                 this.fillCommitFile(item as CommitFileChange);
                 break;
+            case 'message':
+                this.fillMessage(item as string);
+                break;
         }
+    }
+
+    private fillMessage(message: string): void {
+        this.label = message;
+        this.contextValue = 'message';
+        this.iconPath = new vscode.ThemeIcon('info');
     }
 
     private fillProject(data: ProjectChangeData): void {
@@ -91,38 +129,10 @@ export class ChangeTreeItem extends vscode.TreeItem {
             project: fileChange.project
         };
         this.contextValue = fileChange.type === 'deleted' ? 'commitFile deletedCommitFile' : 'commitFile';
-        this.iconPath = this.getIconForChangeType(fileChange.type);
-        this.description = this.getChangeTypeLabel(fileChange.type);
-        this.tooltip = `${fileChange.displayPath}\n类型: ${this.getChangeTypeLabel(fileChange.type)}`;
+        this.iconPath = getIconForChangeType(fileChange.type);
+        this.description = getChangeTypeLabel(fileChange.type);
+        this.tooltip = `${fileChange.displayPath}\n类型: ${getChangeTypeLabel(fileChange.type)}`;
         this.collapsibleState = vscode.TreeItemCollapsibleState.None;
-    }
-
-    private getIconForChangeType(type: GitChangeType): vscode.ThemeIcon {
-        switch (type) {
-            case 'added':
-                return new vscode.ThemeIcon('add', new vscode.ThemeColor('gitDecoration.addedResourceForeground'));
-            case 'modified':
-                return new vscode.ThemeIcon('edit', new vscode.ThemeColor('gitDecoration.modifiedResourceForeground'));
-            case 'deleted':
-                return new vscode.ThemeIcon('trash', new vscode.ThemeColor('gitDecoration.deletedResourceForeground'));
-            case 'renamed':
-                return new vscode.ThemeIcon('arrow-right', new vscode.ThemeColor('gitDecoration.renamedResourceForeground'));
-            case 'moved':
-                return new vscode.ThemeIcon('arrow-swap', new vscode.ThemeColor('gitDecoration.renamedResourceForeground'));
-            default:
-                return new vscode.ThemeIcon('file');
-        }
-    }
-
-    private getChangeTypeLabel(type: GitChangeType): string {
-        switch (type) {
-            case 'added': return '新增';
-            case 'modified': return '修改';
-            case 'deleted': return '删除';
-            case 'renamed': return '重命名';
-            case 'moved': return '移动';
-            default: return '未知';
-        }
     }
 }
 
@@ -149,7 +159,7 @@ export class ChangesTreeProvider implements vscode.TreeDataProvider<ChangeTreeIt
             this.projectData = await this.gitDetector.getProjectChangeData();
 
             if (this.projectData.length === 0) {
-                return [this.createMessageItem('没有检测到文件变更')];
+                return [new ChangeTreeItem('没有检测到文件变更', 'message')];
             }
 
             return this.projectData.map(data => new ChangeTreeItem(data, 'project'));
@@ -175,7 +185,7 @@ export class ChangesTreeProvider implements vscode.TreeDataProvider<ChangeTreeIt
                 item.commitFileChange = null;
                 item.contextValue = change.type === 'deleted' ? 'change deletedChange' : 'change';
                 item.label = change.displayPath;
-                item.description = this.getChangeTypeLabelStatic(change.type);
+                item.description = getChangeTypeLabel(change.type);
                 item.tooltip = `${change.path}\n类型: ${change.type}`;
                 return item;
             });
@@ -190,26 +200,8 @@ export class ChangesTreeProvider implements vscode.TreeDataProvider<ChangeTreeIt
         return [];
     }
 
-    private createMessageItem(message: string): ChangeTreeItem {
-        const item = new vscode.TreeItem(message, vscode.TreeItemCollapsibleState.None);
-        item.iconPath = new vscode.ThemeIcon('info');
-        item.contextValue = 'message';
-        return item as ChangeTreeItem;
-    }
-
     getProjectData(): ProjectChangeData[] {
         return this.projectData;
-    }
-
-    private getChangeTypeLabelStatic(type: GitChangeType): string {
-        switch (type) {
-            case 'added': return '新增';
-            case 'modified': return '修改';
-            case 'deleted': return '删除';
-            case 'renamed': return '重命名';
-            case 'moved': return '移动';
-            default: return '未知';
-        }
     }
 }
 
@@ -311,7 +303,7 @@ export class ChangesTreeView {
                 try {
                     await this.uploadSingleChange(change);
                 } catch (error: any) {
-                    vscode.window.showErrorMessage(`上传失败 ${change.relativePath}: ${error.message}`);
+                    vscode.window.showErrorMessage(`上传失败 ${change.relativePath}: ${formatError(error)}`);
                 }
                 completed++;
             }
@@ -329,7 +321,7 @@ export class ChangesTreeView {
                     try {
                         await this.deleteRemoteFile(change);
                     } catch (error: any) {
-                        vscode.window.showErrorMessage(`删除失败 ${displayPath}: ${error.message}`);
+                        vscode.window.showErrorMessage(`删除失败 ${displayPath}: ${formatError(error)}`);
                     }
                     completed++;
                 }
@@ -381,7 +373,7 @@ export class ChangesTreeView {
                 try {
                     await this.uploadCommitFile(fileChange);
                 } catch (error: any) {
-                    vscode.window.showErrorMessage(`上传失败 ${fileChange.displayPath}: ${error.message}`);
+                    vscode.window.showErrorMessage(`上传失败 ${fileChange.displayPath}: ${formatError(error)}`);
                 }
             }
         });
@@ -439,7 +431,7 @@ export class ChangesTreeView {
 
             this.refresh();
         } catch (error: any) {
-            vscode.window.showErrorMessage(`上传失败: ${error.message}`);
+            vscode.window.showErrorMessage(`上传失败: ${formatError(error)}`);
         }
     }
 
@@ -471,7 +463,7 @@ export class ChangesTreeView {
             await this.uploadCommitFile(fileChange);
             vscode.window.setStatusBarMessage(`文件 ${fileChange.displayPath} 上传成功`, 3000);
         } catch (error: any) {
-            vscode.window.showErrorMessage(`上传失败: ${error.message}`);
+            vscode.window.showErrorMessage(`上传失败: ${formatError(error)}`);
         }
     }
 
@@ -484,13 +476,16 @@ export class ChangesTreeView {
             const document = await vscode.workspace.openTextDocument(item.change.path);
             await vscode.window.showTextDocument(document);
         } catch (error: any) {
-            vscode.window.showErrorMessage(`无法打开文件: ${error.message}`);
+            vscode.window.showErrorMessage(`无法打开文件: ${formatError(error)}`);
         }
     }
 
     private async uploadCommitFile(fileChange: CommitFileChange): Promise<void> {
         const project = fileChange.project;
-        const localPath = path.resolve(project.localPath!, fileChange.relativePath);
+        if (!project.localPath) {
+            throw new Error(`工程 "${project.name}" 未配置 localPath，无法上传文件`);
+        }
+        const localPath = path.resolve(project.localPath, fileChange.relativePath);
 
         if (!fs.existsSync(localPath)) {
             throw new Error(`本地文件不存在: ${localPath}`);
@@ -540,7 +535,7 @@ export class ChangesTreeView {
     private calculateRemotePath(change: GitChange): string {
         const project = change.project;
         const relativePath = change.relativePath.replace(/\\/g, '/');
-        return `${project.server.remoteDirectory}/${relativePath}`;
+        return path.posix.join(project.server.remoteDirectory!, relativePath);
     }
 
     private formatDeletedFilesMessage(changes: GitChange[]): string {

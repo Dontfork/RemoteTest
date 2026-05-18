@@ -479,7 +479,7 @@ export class GitChangeDetector {
 
     private async getRecentCommits(localPath: string, count: number): Promise<CommitInfo[]> {
         const { stdout } = await execAsync(
-            `git log -${count} --format="%H%n%h%n%s%n%an%n%ai" --no-merges`,
+            `git log -${count} --format="%H%x00%h%x00%s%x00%an%x00%ai%x00" --no-merges`,
             {
                 cwd: localPath,
                 maxBuffer: 1024 * 1024 * 10,
@@ -493,19 +493,16 @@ export class GitChangeDetector {
         }
 
         const commits: CommitInfo[] = [];
-        const entries = stdout.trim().split('\n\n');
+        const entries = stdout.trim().split('\x00');
 
-        for (const entry of entries) {
-            const lines = entry.trim().split('\n');
-            if (lines.length >= 5) {
-                commits.push({
-                    hash: lines[0],
-                    shortHash: lines[1],
-                    message: lines[2],
-                    author: lines[3],
-                    date: lines[4]
-                });
-            }
+        for (let i = 0; i + 4 < entries.length; i += 5) {
+            commits.push({
+                hash: entries[i],
+                shortHash: entries[i + 1],
+                message: entries[i + 2],
+                author: entries[i + 3],
+                date: entries[i + 4]
+            });
         }
 
         return commits;

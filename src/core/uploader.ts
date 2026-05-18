@@ -4,7 +4,7 @@ import * as path from 'path';
 import { getConfig, matchProject, hasValidLocalPath, hasValidRemoteDirectory } from '../config';
 import { SCPClient } from './scpClient';
 import { CommandExecutor, replaceCommandVariables, buildCommandVariables } from './commandExecutor';
-import { executeRemoteCommand, isExecuting } from './sshClient';
+import { executeRemoteCommand, isExecuting, formatError } from './sshClient';
 import { ProjectConfig, CommandConfig } from '../types';
 import { UnifiedOutputChannel } from '../utils/outputChannel';
 
@@ -143,9 +143,9 @@ export class FileUploader {
                 this.onTestCaseComplete();
             }
         } catch (error: any) {
-            this.pluginChannel.error(`[错误] ${error.message}`);
+            this.pluginChannel.error(`[错误] ${formatError(error)}`);
             this.pluginChannel.show();
-            vscode.window.showErrorMessage(`操作失败: ${error.message}`);
+            vscode.window.showErrorMessage(`操作失败: ${formatError(error)}`);
             throw error;
         }
     }
@@ -202,9 +202,9 @@ export class FileUploader {
                 this.onTestCaseComplete();
             }
         } catch (error: any) {
-            this.pluginChannel.error(`[错误] ${error.message}`);
+            this.pluginChannel.error(`[错误] ${formatError(error)}`);
             this.pluginChannel.show();
-            vscode.window.showErrorMessage(`操作失败: ${error.message}`);
+            vscode.window.showErrorMessage(`操作失败: ${formatError(error)}`);
             throw error;
         }
     }
@@ -318,9 +318,9 @@ export class FileUploader {
                 }
             });
         } catch (error: any) {
-            this.pluginChannel.error(`[上传失败] ${error.message}`);
+            this.pluginChannel.error(`[上传失败] ${formatError(error)}`);
             this.pluginChannel.show();
-            vscode.window.showErrorMessage(`上传失败: ${error.message}`);
+            vscode.window.showErrorMessage(`上传失败: ${formatError(error)}`);
             throw error;
         }
     }
@@ -391,9 +391,9 @@ export class FileUploader {
                 }
             });
         } catch (error: any) {
-            this.pluginChannel.error(`[同步失败] ${error.message}`);
+            this.pluginChannel.error(`[同步失败] ${formatError(error)}`);
             this.pluginChannel.show();
-            vscode.window.showErrorMessage(`同步失败: ${error.message}`);
+            vscode.window.showErrorMessage(`同步失败: ${formatError(error)}`);
             throw error;
         }
     }

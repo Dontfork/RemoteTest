@@ -8,6 +8,18 @@ interface PooledConnection {
     serverKey: string;
 }
 
+let debugLogFn: ((msg: string) => void) | null = null;
+
+export function setConnectionPoolLogger(fn: (msg: string) => void): void {
+    debugLogFn = fn;
+}
+
+function debugLog(msg: string): void {
+    if (debugLogFn) {
+        debugLogFn(`[连接池] ${msg}`);
+    }
+}
+
 export class ConnectionPool {
     private static instance: ConnectionPool | null = null;
     private connections: Map<string, PooledConnection> = new Map();
@@ -51,15 +63,16 @@ export class ConnectionPool {
 
         if (pooled) {
             try {
-                // 添加连接活跃性检查：尝试执行一个简单的操作验证连接是否仍然有效
-                await pooled.client.stat('.');
+                await pooled.client.list('/');
                 pooled.lastUsed = Date.now();
                 return pooled.client;
-            } catch {
-                // 连接已断开或不可用，删除并重新创建
+            } catch (checkErr) {
+                debugLog(`连接 ${key} 已断开，重新创建 (${checkErr})`);
                 try {
                     await pooled.client.end();
-                } catch {}
+                } catch (endErr) {
+                    debugLog(`关闭旧连接失败: ${endErr}`);
+                }
                 this.connections.delete(key);
             }
         }
@@ -78,6 +91,7 @@ export class ConnectionPool {
             serverKey: key
         });
 
+        debugLog(`新建连接: ${key} (当前连接数: ${this.connections.size})`);
         return client;
     }
 
@@ -95,9 +109,11 @@ export class ConnectionPool {
         if (oldest && oldestKey) {
             try {
                 await oldest.client.end();
-            } catch {
+            } catch (endErr) {
+                debugLog(`淘汰连接关闭失败: ${endErr}`);
             }
             this.connections.delete(oldestKey);
+            debugLog(`淘汰最旧连接: ${oldestKey}`);
         }
     }
 
@@ -122,10 +138,15 @@ export class ConnectionPool {
             if (conn) {
                 try {
                     await conn.client.end();
-                } catch {
+                } catch (endErr) {
+                    debugLog(`空闲连接关闭失败: ${endErr}`);
                 }
                 this.connections.delete(key);
             }
+        }
+
+        if (keysToRemove.length > 0) {
+            debugLog(`清理 ${keysToRemove.length} 个空闲连接`);
         }
     }
 
@@ -136,7 +157,8 @@ export class ConnectionPool {
         if (pooled) {
             try {
                 await pooled.client.end();
-            } catch {
+            } catch (endErr) {
+                debugLog(`释放连接关闭失败: ${endErr}`);
             }
             this.connections.delete(key);
         }
@@ -146,7 +168,8 @@ export class ConnectionPool {
         for (const [key, conn] of this.connections) {
             try {
                 await conn.client.end();
-            } catch {
+            } catch (endErr) {
+                debugLog(`释放全部连接关闭失败 (${key}): ${endErr}`);
             }
         }
         this.connections.clear();

@@ -3,6 +3,7 @@ import { loadConfig, reloadConfig, setupConfigWatcher, onConfigChanged, dispose 
 import { CommandExecutor, FileUploader } from './core';
 import { ConnectionPool } from './core/connectionPool';
 import { LogTreeView, LogTreeItem, ChangesTreeView, ChangeTreeItem, QuickCommandsTreeView, QuickCommandItem } from './views';
+import { formatError } from './core/sshClient';
 
 let commandExecutor: CommandExecutor;
 let fileUploader: FileUploader;
@@ -56,7 +57,7 @@ export function activate(context: vscode.ExtensionContext) {
                 }
                 await fileUploader.runTestCase(uri.fsPath);
             } catch (error: any) {
-                vscode.window.showErrorMessage(`运行用例失败: ${error.message}`);
+                vscode.window.showErrorMessage(`运行用例失败: ${formatError(error)}`);
             }
         }),
 
@@ -73,7 +74,7 @@ export function activate(context: vscode.ExtensionContext) {
                 }
                 await fileUploader.uploadFile(uri.fsPath);
             } catch (error: any) {
-                vscode.window.showErrorMessage(`上传失败: ${error.message}`);
+                vscode.window.showErrorMessage(`上传失败: ${formatError(error)}`);
             }
         }),
 
@@ -90,7 +91,7 @@ export function activate(context: vscode.ExtensionContext) {
                 }
                 await fileUploader.syncFile(uri.fsPath);
             } catch (error: any) {
-                vscode.window.showErrorMessage(`同步失败: ${error.message}`);
+                vscode.window.showErrorMessage(`同步失败: ${formatError(error)}`);
             }
         }),
 
