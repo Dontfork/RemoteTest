@@ -2,9 +2,8 @@
   "name": "remote-test",
   "displayName": "remote-test",
   "description": "实现文件上传、命令执行和日志监控功能",
-  "version": "1.0.3",
-  "publisher": "YiEvan",
-  "icon": "resources/logo.png",
+  "version": "1.0.4",
+  "publisher": "RemoteTest",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -12,7 +11,11 @@
     "Other"
   ],
   "activationEvents": [
-    "onStartupFinished"
+    "onStartupFinished",
+    "onView:remote-test-view",
+    "onView:RemoteTestLogs",
+    "onView:RemoteTestChanges",
+    "onView:RemoteTestQuickCommands"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -102,6 +105,16 @@
         "icon": "$(eye)"
       },
       {
+        "command": "RemoteTest.uploadCommitChanges",
+        "title": "上传此 commit 的所有文件",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "RemoteTest.uploadCommitFileChange",
+        "title": "上传此文件",
+        "icon": "$(cloud-upload)"
+      },
+      {
         "command": "RemoteTest.refreshQuickCommands",
         "title": "RemoteTest: 刷新快捷命令",
         "icon": "$(refresh)"
@@ -120,44 +133,26 @@
           "group": "navigation@1"
         },
         {
-          "command": "RemoteTest.reloadConfig",
-          "when": "view == RemoteTestQuickCommands",
-          "group": "navigation@2"
-        },
-        {
-          "command": "RemoteTest.openConfig",
-          "when": "view == RemoteTestQuickCommands",
-          "group": "navigation@3"
-        },
-        {
           "command": "RemoteTest.refreshLogs",
           "when": "view == RemoteTestLogs",
           "group": "navigation@1"
         },
         {
-          "command": "RemoteTest.reloadConfig",
-          "when": "view == RemoteTestLogs",
-          "group": "navigation@2"
-        },
-        {
-          "command": "RemoteTest.openConfig",
-          "when": "view == RemoteTestLogs",
-          "group": "navigation@3"
-        },
-        {
           "command": "RemoteTest.refreshChanges",
           "when": "view == RemoteTestChanges",
           "group": "navigation@1"
-        },
+        }
+      ],
+      "viewContainer/title": [
         {
           "command": "RemoteTest.reloadConfig",
-          "when": "view == RemoteTestChanges",
-          "group": "navigation@2"
+          "when": "viewContainer == remote-test-view",
+          "group": "navigation@1"
         },
         {
           "command": "RemoteTest.openConfig",
-          "when": "view == RemoteTestChanges",
-          "group": "navigation@3"
+          "when": "viewContainer == remote-test-view",
+          "group": "navigation@2"
         }
       ],
       "view/item/context": [
@@ -190,6 +185,16 @@
           "command": "RemoteTest.openChangeFile",
           "when": "view == RemoteTestChanges && viewItem == change",
           "group": "inline@2"
+        },
+        {
+          "command": "RemoteTest.uploadCommitChanges",
+          "when": "view == RemoteTestChanges && viewItem == commitGroup",
+          "group": "inline@1"
+        },
+        {
+          "command": "RemoteTest.uploadCommitFileChange",
+          "when": "view == RemoteTestChanges && viewItem =~ /^commitFile($| )/",
+          "group": "inline@1"
         }
       ],
       "explorer/context": [
@@ -199,13 +204,25 @@
         },
         {
           "command": "RemoteTest.uploadFile",
-          "group": "RemoteTest@2",
-          "title": "上传文件"
+          "group": "RemoteTest@2"
         },
         {
           "command": "RemoteTest.syncFile",
-          "group": "RemoteTest@3",
-          "title": "下载文件"
+          "group": "RemoteTest@3"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "RemoteTest.runTestCase",
+          "group": "RemoteTest@1"
+        },
+        {
+          "command": "RemoteTest.uploadFile",
+          "group": "RemoteTest@2"
+        },
+        {
+          "command": "RemoteTest.syncFile",
+          "group": "RemoteTest@3"
         }
       ]
     },
@@ -253,17 +270,5 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/Dontfork/RemoteTest.git"
-  },
-  "bugs": {
-    "url": "https://github.com/Dontfork/RemoteTest/issues"
-  },
-  "keywords": [
-    "remote",
-    "ssh",
-    "ftp",
-    "upload",
-    "test",
-    "log",
-    "monitor"
-  ]
+  }
 }

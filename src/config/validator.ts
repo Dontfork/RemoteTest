@@ -16,9 +16,9 @@ export interface MissingField {
     defaultValue: any;
 }
 
-const VALID_ROOT_KEYS = ['projects', 'refreshInterval', 'textFileExtensions', 'clearOutputBeforeRun', 'useLogOutputChannel', 'logViewer'];
+const VALID_ROOT_KEYS = ['projects', 'refreshInterval', 'textFileExtensions', 'clearOutputBeforeRun', 'useLogOutputChannel', 'logViewer', 'commitCount'];
 
-const VALID_PROJECT_KEYS = ['name', 'localPath', 'enabled', 'server', 'commands', 'logs'];
+const VALID_PROJECT_KEYS = ['name', 'localPath', 'enabled', 'server', 'commands', 'logs', 'textFileExtensions', 'commitCount'];
 
 const VALID_SERVER_KEYS = ['host', 'port', 'username', 'password', 'privateKeyPath', 'remoteDirectory'];
 
@@ -294,10 +294,41 @@ export function validateConfig(config: any): ConfigValidationResult {
         if (project.enabled !== undefined && typeof project.enabled !== 'boolean') {
             warnings.push(`工程 "${project.name || i + 1}" 的 enabled 字段应为布尔值，当前类型为 "${typeof project.enabled}"`);
         }
+
+        if (project.textFileExtensions !== undefined) {
+            if (!Array.isArray(project.textFileExtensions)) {
+                errors.push(`工程 "${project.name || i + 1}" 的 textFileExtensions 必须是数组类型，当前类型为 "${typeof project.textFileExtensions}"`);
+            } else {
+                for (let e = 0; e < project.textFileExtensions.length; e++) {
+                    const ext = project.textFileExtensions[e];
+                    if (typeof ext !== 'string') {
+                        errors.push(`工程 "${project.name || i + 1}" 的 textFileExtensions[${e}] 必须是字符串类型`);
+                    } else if (!ext.startsWith('.')) {
+                        warnings.push(`工程 "${project.name || i + 1}" 的 textFileExtensions[${e}] 建议以点号开头，例如 ".${ext}"`);
+                    }
+                }
+            }
+        }
+
+        if (project.commitCount !== undefined) {
+            if (typeof project.commitCount !== 'number') {
+                errors.push(`工程 "${project.name || i + 1}" 的 commitCount 必须是数字类型，当前类型为 "${typeof project.commitCount}"`);
+            } else if (!Number.isInteger(project.commitCount) || project.commitCount < 0) {
+                errors.push(`工程 "${project.name || i + 1}" 的 commitCount 必须是非负整数，当前值为 ${project.commitCount}`);
+            }
+        }
     }
 
     if (config.refreshInterval === undefined) {
         warnings.push('未配置 refreshInterval，将使用默认值 0（禁用自动刷新）');
+    }
+
+    if (config.commitCount !== undefined) {
+        if (typeof config.commitCount !== 'number') {
+            errors.push(`commitCount 必须是数字类型，当前类型为 "${typeof config.commitCount}"`);
+        } else if (!Number.isInteger(config.commitCount) || config.commitCount < 0) {
+            errors.push(`commitCount 必须是非负整数，当前值为 ${config.commitCount}`);
+        }
     }
 
     if (unknownKeys.length > 0) {

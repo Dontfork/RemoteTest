@@ -2,8 +2,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import SftpClient from 'ssh2-sftp-client';
-import { getConfig, getServerConfig } from '../config';
-import { LogFile, ServerConfig } from '../types';
+import { getConfig } from '../config';
+import { LogFile, ProjectConfig, ServerConfig } from '../types';
 import { ConnectionPool } from './connectionPool';
 import { createSSHAuthConfig } from '../utils/auth';
 
@@ -27,7 +27,10 @@ function isTextFile(filePath: string, customExtensions?: string[]): boolean {
     const ext = path.extname(filePath).toLowerCase();
     
     const allExtensions = customExtensions 
-        ? [...DEFAULT_TEXT_FILE_EXTENSIONS, ...customExtensions.map(e => e.toLowerCase())]
+        ? [...DEFAULT_TEXT_FILE_EXTENSIONS, ...customExtensions.map(e => {
+            const lower = e.toLowerCase();
+            return lower.startsWith('.') ? lower : '.' + lower;
+        })]
         : DEFAULT_TEXT_FILE_EXTENSIONS;
     
     if (allExtensions.includes(ext)) {
@@ -49,16 +52,21 @@ function convertCrlfToLf(content: Buffer): Buffer {
 
 export class SCPClient {
     private serverConfig: ServerConfig | null = null;
+    private projectConfig: ProjectConfig | null = null;
     private usePool: boolean = true;
     private standaloneClient: SftpClient | null = null;
 
-    constructor(serverConfig?: ServerConfig, usePool: boolean = true) {
+    constructor(serverConfig?: ServerConfig, usePool: boolean = true, projectConfig?: ProjectConfig) {
         this.serverConfig = serverConfig || null;
         this.usePool = usePool;
+        this.projectConfig = projectConfig || null;
     }
 
     async connect(): Promise<SftpClient> {
-        const serverConfig = getServerConfig(this.serverConfig || undefined);
+        if (!this.serverConfig) {
+            throw new Error('未指定服务器配置，无法建立 SFTP 连接');
+        }
+        const serverConfig = this.serverConfig;
 
         if (this.usePool) {
             return ConnectionPool.getInstance().getConnection(serverConfig);
@@ -99,9 +107,19 @@ export class SCPClient {
     }
 
     async uploadFile(localPath: string, remotePath?: string): Promise<string> {
-        const serverConfig = getServerConfig(this.serverConfig || undefined);
+        if (!this.serverConfig) {
+            throw new Error('未指定服务器配置，无法上传文件');
+        }
+        const serverConfig = this.serverConfig;
         const sftp = await this.connect();
         const config = getConfig();
+
+        const projectExtensions = this.projectConfig?.textFileExtensions;
+        const globalExtensions = config.textFileExtensions;
+        const mergedExtensions = [
+            ...(projectExtensions || []),
+            ...(globalExtensions || [])
+        ];
 
         const fileName = path.basename(localPath);
         
@@ -118,7 +136,7 @@ export class SCPClient {
         } catch {
         }
 
-        if (isTextFile(localPath, config.textFileExtensions)) {
+        if (isTextFile(localPath, mergedExtensions.length > 0 ? mergedExtensions : undefined)) {
             const content = fs.readFileSync(localPath);
             const convertedContent = convertCrlfToLf(content);
             await sftp.put(convertedContent, remotePath);
@@ -129,7 +147,6 @@ export class SCPClient {
     }
 
     async downloadFile(remotePath: string, localPath?: string): Promise<string> {
-        const config = getConfig();
         const sftp = await this.connect();
 
         const fileName = path.basename(remotePath);
@@ -138,13 +155,8 @@ export class SCPClient {
         if (localPath) {
             downloadPath = localPath;
         } else {
-            if (config.projects && config.projects.length > 0) {
-                for (const project of config.projects) {
-                    if (project.enabled !== false && project.logs && project.logs.downloadPath) {
-                        downloadPath = path.join(project.logs.downloadPath, fileName);
-                        break;
-                    }
-                }
+            if (this.projectConfig && this.projectConfig.logs && this.projectConfig.logs.downloadPath) {
+                downloadPath = path.join(this.projectConfig.logs.downloadPath, fileName);
             }
             if (!downloadPath) {
                 throw new Error('未配置日志下载路径');

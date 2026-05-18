@@ -40,13 +40,16 @@ const defaultConfig: RemoteTestConfig = {
                     { name: "应用日志", path: "/var/log/app" }
                 ],
                 downloadPath: "D:\\downloads\\logs"
-            }
+            },
+            textFileExtensions: [],
+            commitCount: 0
         }
     ],
     refreshInterval: 0,
     useLogOutputChannel: true,
     textFileExtensions: [],
-    logViewer: ""
+    logViewer: "",
+    commitCount: 0
 };
 
 function deepMerge<T>(target: T, source: Partial<T>): T {
@@ -219,7 +222,8 @@ export function loadConfig(workspacePath: string): RemoteTestConfig {
                 textFileExtensions: finalConfig.textFileExtensions,
                 clearOutputBeforeRun: finalConfig.clearOutputBeforeRun ?? true,
                 useLogOutputChannel: finalConfig.useLogOutputChannel ?? true,
-                logViewer: finalConfig.logViewer ?? ""
+                logViewer: finalConfig.logViewer ?? "",
+                commitCount: finalConfig.commitCount ?? 0
             };
         } else {
             vscode.window.showErrorMessage('配置文件格式错误：缺少 projects 数组，请检查配置文件格式');
@@ -245,6 +249,15 @@ export function getRefreshInterval(): number {
 export function getUseLogOutputChannel(): boolean {
     const currentConfig = getConfig();
     return currentConfig.useLogOutputChannel ?? true;
+}
+
+export function getCommitCount(): number {
+    const currentConfig = getConfig();
+    return currentConfig.commitCount ?? 0;
+}
+
+export function getProjectCommitCount(project: ProjectConfig): number {
+    return project.commitCount ?? getCommitCount();
 }
 
 export function getEnabledProjects(): ProjectConfig[] {
@@ -432,12 +445,7 @@ export function getServerConfig(serverConfig?: ServerConfig): ServerConfig {
         return serverConfig;
     }
     
-    const config = getConfig();
-    if (config.projects && config.projects.length > 0 && config.projects[0].enabled !== false) {
-        return config.projects[0].server;
-    }
-    
-    throw new Error('未配置服务器信息');
+    throw new Error('未指定服务器配置，请传入 serverConfig 参数');
 }
 
 export { defaultConfig, checkPathConflict };

@@ -3,8 +3,8 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { GitChange, GitChangeGroup, GitChangeType, ProjectConfig } from '../types';
-import { getProjectsWithLocalPath } from '../config';
+import { GitChange, GitChangeGroup, GitChangeType, ProjectConfig, CommitInfo, CommitChangeGroup, CommitFileChange, ProjectChangeData } from '../types';
+import { getProjectsWithLocalPath, getProjectCommitCount } from '../config';
 import { getOutputChannelManager, UnifiedOutputChannel } from '../utils/outputChannel';
 
 const execAsync = promisify(exec);
@@ -411,6 +411,180 @@ export class GitChangeDetector {
     async hasDeletedFiles(): Promise<boolean> {
         const deletedFiles = await this.getDeletedFiles();
         return deletedFiles.length > 0;
+    }
+
+    async getProjectChangeData(): Promise<ProjectChangeData[]> {
+        const projects = getProjectsWithLocalPath();
+        if (projects.length === 0) {
+            return [];
+        }
+
+        const results: ProjectChangeData[] = [];
+
+        for (const project of projects) {
+            if (!project.localPath) {
+                continue;
+            }
+
+            const localPath = path.resolve(project.localPath);
+            const isGitRepo = await this.isGitRepository(localPath);
+            if (!isGitRepo) {
+                continue;
+            }
+
+            const uncommittedChanges = await this.getProjectChanges(project, localPath);
+            const commitCount = getProjectCommitCount(project);
+            let commitGroups: CommitChangeGroup[] = [];
+
+            if (commitCount > 0) {
+                commitGroups = await this.getCommitChanges(project, localPath, commitCount);
+            }
+
+            if (uncommittedChanges.length > 0 || commitGroups.length > 0) {
+                results.push({
+                    projectName: project.name,
+                    project: project,
+                    uncommittedChanges: uncommittedChanges,
+                    commitGroups: commitGroups
+                });
+            }
+        }
+
+        return results;
+    }
+
+    private async getCommitChanges(project: ProjectConfig, localPath: string, count: number): Promise<CommitChangeGroup[]> {
+        try {
+            const commits = await this.getRecentCommits(localPath, count);
+            const groups: CommitChangeGroup[] = [];
+
+            for (const commit of commits) {
+                const fileChanges = await this.getCommitFileChanges(commit, project, localPath);
+                if (fileChanges.length > 0) {
+                    groups.push({
+                        commit: commit,
+                        projectName: project.name,
+                        project: project,
+                        changes: fileChanges
+                    });
+                }
+            }
+
+            return groups;
+        } catch (error: any) {
+            this.outputChannel.error(`[${project.name}] 获取 commit 记录错误: ${error.message}`);
+            return [];
+        }
+    }
+
+    private async getRecentCommits(localPath: string, count: number): Promise<CommitInfo[]> {
+        const { stdout } = await execAsync(
+            `git log -${count} --format="%H%n%h%n%s%n%an%n%ai" --no-merges`,
+            {
+                cwd: localPath,
+                maxBuffer: 1024 * 1024 * 10,
+                encoding: 'utf8',
+                env: { ...process.env, LANG: 'C.UTF-8' }
+            }
+        );
+
+        if (!stdout.trim()) {
+            return [];
+        }
+
+        const commits: CommitInfo[] = [];
+        const entries = stdout.trim().split('\n\n');
+
+        for (const entry of entries) {
+            const lines = entry.trim().split('\n');
+            if (lines.length >= 5) {
+                commits.push({
+                    hash: lines[0],
+                    shortHash: lines[1],
+                    message: lines[2],
+                    author: lines[3],
+                    date: lines[4]
+                });
+            }
+        }
+
+        return commits;
+    }
+
+    private async getCommitFileChanges(commit: CommitInfo, project: ProjectConfig, localPath: string): Promise<CommitFileChange[]> {
+        const { stdout } = await execAsync(
+            `git diff-tree --no-commit-id -r --name-status ${commit.hash}`,
+            {
+                cwd: localPath,
+                maxBuffer: 1024 * 1024 * 10,
+                encoding: 'utf8',
+                env: { ...process.env, LANG: 'C.UTF-8' }
+            }
+        );
+
+        if (!stdout.trim()) {
+            return [];
+        }
+
+        const changes: CommitFileChange[] = [];
+        const lines = stdout.trim().split('\n');
+
+        for (const line of lines) {
+            const parts = line.split('\t');
+            if (parts.length < 2) {
+                continue;
+            }
+
+            const status = parts[0].trim();
+            let filePath = parts[1].trim();
+            let oldFilePath: string | undefined;
+
+            if (filePath.startsWith('"') && filePath.endsWith('"')) {
+                filePath = filePath.slice(1, -1);
+            }
+
+            if (parts.length >= 3) {
+                oldFilePath = parts[1].trim();
+                filePath = parts[2].trim();
+                if (oldFilePath.startsWith('"') && oldFilePath.endsWith('"')) {
+                    oldFilePath = oldFilePath.slice(1, -1);
+                }
+                if (filePath.startsWith('"') && filePath.endsWith('"')) {
+                    filePath = filePath.slice(1, -1);
+                }
+            }
+
+            const changeType = this.parseDiffTreeStatus(status);
+            const relativePath = filePath.replace(/\\/g, '/');
+            const displayPath = relativePath;
+
+            const change: CommitFileChange = {
+                relativePath: relativePath,
+                displayPath: displayPath,
+                type: changeType,
+                project: project
+            };
+
+            changes.push(change);
+        }
+
+        return changes;
+    }
+
+    private parseDiffTreeStatus(status: string): GitChangeType {
+        if (status.startsWith('A')) {
+            return 'added';
+        }
+        if (status.startsWith('D')) {
+            return 'deleted';
+        }
+        if (status.startsWith('R')) {
+            return 'renamed';
+        }
+        if (status.startsWith('C')) {
+            return 'added';
+        }
+        return 'modified';
     }
 
     showDebugLog(): void {

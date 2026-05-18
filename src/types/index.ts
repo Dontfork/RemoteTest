@@ -105,6 +105,10 @@ export interface ProjectConfig {
     commands?: CommandConfig[];
     /** 日志监控配置 */
     logs?: ProjectLogsConfig;
+    /** 自定义文本文件扩展名列表，用于判断文件是否需要换行符转换（CRLF→LF） */
+    textFileExtensions?: string[];
+    /** 显示最近多少条 commit 记录，0 表示不显示（默认） */
+    commitCount?: number;
 }
 
 /**
@@ -125,6 +129,8 @@ export interface RemoteTestConfig {
     useLogOutputChannel?: boolean;
     /** 自定义日志查看程序路径，为空则使用 VSCode 默认编辑器 */
     logViewer?: string;
+    /** 全局默认显示最近多少条 commit 记录，0 表示不显示 */
+    commitCount?: number;
 }
 
 /**
@@ -198,6 +204,72 @@ export interface GitChangeGroup {
     project: ProjectConfig;
     /** 该项目的变更列表 */
     changes: GitChange[];
+}
+
+/**
+ * Git commit 信息接口
+ * 
+ * 描述一个 Git commit 的基本信息。
+ */
+export interface CommitInfo {
+    /** commit 哈希值（完整） */
+    hash: string;
+    /** commit 哈希值（短格式） */
+    shortHash: string;
+    /** commit 提交信息 */
+    message: string;
+    /** 提交者 */
+    author: string;
+    /** 提交日期 */
+    date: string;
+}
+
+/**
+ * commit 中的文件变更接口
+ * 
+ * 描述一个 commit 中某个文件的变更信息。
+ */
+export interface CommitFileChange {
+    /** 文件相对路径（相对于工作区根目录） */
+    relativePath: string;
+    /** 用于显示的文件路径 */
+    displayPath: string;
+    /** 变更类型 */
+    type: GitChangeType;
+    /** 所属项目 */
+    project: ProjectConfig;
+}
+
+/**
+ * commit 变更分组接口
+ * 
+ * 按 commit 分组的文件变更列表，用于在树形视图中显示。
+ */
+export interface CommitChangeGroup {
+    /** commit 信息 */
+    commit: CommitInfo;
+    /** 所属项目名称 */
+    projectName: string;
+    /** 所属项目配置 */
+    project: ProjectConfig;
+    /** 该 commit 的文件变更列表 */
+    changes: CommitFileChange[];
+}
+
+/**
+ * 项目变更数据接口
+ * 
+ * 一个项目的完整变更数据，包含未提交变更和 commit 历史。
+ */
+export interface ProjectChangeData {
+    /** 项目名称 */
+    projectName: string;
+    /** 项目配置 */
+    project: ProjectConfig;
+    /** 未提交的变更列表 */
+    uncommittedChanges: GitChange[];
+    /** commit 变更分组列表 */
+    commitGroups: CommitChangeGroup[];
 }
 
 /**

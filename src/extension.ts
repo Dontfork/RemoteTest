@@ -156,6 +156,14 @@ export function activate(context: vscode.ExtensionContext) {
             await changesTreeView.openChangeFile(item);
         }),
 
+        vscode.commands.registerCommand('RemoteTest.uploadCommitChanges', async (item: ChangeTreeItem) => {
+            await changesTreeView.uploadCommitChanges(item);
+        }),
+
+        vscode.commands.registerCommand('RemoteTest.uploadCommitFileChange', async (item: ChangeTreeItem) => {
+            await changesTreeView.uploadCommitFileChange(item);
+        }),
+
         vscode.commands.registerCommand('RemoteTest.refreshQuickCommands', async () => {
             quickCommandsTreeView.refresh();
         }),

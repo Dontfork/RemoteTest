@@ -221,7 +221,7 @@ export class FileUploader {
 
         const remoteFilePath = this.calculateRemotePath(localFilePath, project);
 
-        const scpClient = new SCPClient(project.server);
+        const scpClient = new SCPClient(project.server, true, project);
         try {
             await scpClient.uploadFile(localFilePath, remoteFilePath);
         } finally {
@@ -288,7 +288,7 @@ export class FileUploader {
 
                     progress.report({ message: `发现 ${files.length} 个文件，开始上传...` });
                     
-                    const scpClient = new SCPClient(project.server);
+                    const scpClient = new SCPClient(project.server, true, project);
                     try {
                         for (let i = 0; i < files.length; i++) {
                             const file = files[i];
@@ -307,7 +307,7 @@ export class FileUploader {
                     progress.report({ message: `正在上传: ${name}` });
                     
                     const remotePath = this.calculateRemotePath(localPath, project);
-                    const scpClient = new SCPClient(project.server);
+                    const scpClient = new SCPClient(project.server, true, project);
                     try {
                         await scpClient.uploadFile(localPath, remotePath);
                     } finally {
@@ -369,7 +369,7 @@ export class FileUploader {
                 if (isDirectory) {
                     progress.report({ message: `正在同步目录: ${name}` });
                     
-                    const scpClient = new SCPClient(project.server);
+                    const scpClient = new SCPClient(project.server, true, project);
                     try {
                         await scpClient.downloadDirectory(remotePath, localPath);
                     } finally {
@@ -380,7 +380,7 @@ export class FileUploader {
                 } else {
                     progress.report({ message: `正在同步文件: ${name}` });
                     
-                    const scpClient = new SCPClient(project.server);
+                    const scpClient = new SCPClient(project.server, true, project);
                     try {
                         await scpClient.downloadFile(remotePath, localPath);
                     } finally {

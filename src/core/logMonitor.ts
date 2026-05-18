@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { getConfig, getEnabledProjects, getAllLogDirectories, getRefreshInterval, getServerConfig } from '../config';
+import { getConfig, getEnabledProjects, getAllLogDirectories, getRefreshInterval } from '../config';
 import { SCPClient } from './scpClient';
 import { ConnectionPool } from './connectionPool';
 import { LogFile, LogDirectoryConfig, ProjectConfig, ServerConfig } from '../types';
@@ -41,8 +41,11 @@ export class LogMonitor {
 
     async fetchDirectoryContents(dirPath: string, project: ProjectConfig | null = null): Promise<{ files: LogFile[]; error: string | null }> {
         try {
-            const serverConfig = getServerConfig(project?.server);
-            const scpClient = new SCPClient(serverConfig, true);
+            const serverConfig = project?.server;
+            if (!serverConfig) {
+                throw new Error('未指定服务器配置');
+            }
+            const scpClient = new SCPClient(serverConfig, true, project ?? undefined);
             try {
                 const items = await scpClient.listDirectory(dirPath);
                 const sortedItems = items.sort((a, b) => {
@@ -72,7 +75,10 @@ export class LogMonitor {
         const dirsByServer = new Map<string, Array<{ dir: LogDirectoryConfig; project: ProjectConfig | null }>>();
 
         for (const item of allDirs) {
-            const serverConfig = getServerConfig(item.project?.server);
+            const serverConfig = item.project?.server;
+            if (!serverConfig) {
+                continue;
+            }
             const serverKey = `${serverConfig.host}:${serverConfig.port}:${serverConfig.username}`;
             
             if (!dirsByServer.has(serverKey)) {
@@ -89,8 +95,12 @@ export class LogMonitor {
         for (const [serverKey, dirs] of dirsByServer) {
             if (dirs.length === 0) continue;
 
-            const serverConfig = getServerConfig(dirs[0].project?.server);
-            const scpClient = new SCPClient(serverConfig, true);
+            const serverConfig = dirs[0].project?.server;
+            if (!serverConfig) {
+                log(`服务器配置缺失，跳过服务器 ${serverKey}`);
+                continue;
+            }
+            const scpClient = new SCPClient(serverConfig, true, dirs[0].project ?? undefined);
 
             try {
                 for (const { dir, project } of dirs) {
@@ -184,8 +194,11 @@ export class LogMonitor {
         const localPath = path.join(downloadPath, logFile.name);
 
         try {
-            const serverConfig = getServerConfig(project?.server);
-            const scpClient = new SCPClient(serverConfig, true);
+            const serverConfig = project?.server;
+            if (!serverConfig) {
+                throw new Error('未指定服务器配置');
+            }
+            const scpClient = new SCPClient(serverConfig, true, project ?? undefined);
             await scpClient.downloadFile(logFile.path, localPath);
             await scpClient.disconnect();
             return localPath;

@@ -51,9 +51,15 @@ export class ConnectionPool {
 
         if (pooled) {
             try {
+                // 添加连接活跃性检查：尝试执行一个简单的操作验证连接是否仍然有效
+                await pooled.client.stat('.');
                 pooled.lastUsed = Date.now();
                 return pooled.client;
             } catch {
+                // 连接已断开或不可用，删除并重新创建
+                try {
+                    await pooled.client.end();
+                } catch {}
                 this.connections.delete(key);
             }
         }

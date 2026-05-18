@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import { Client, ConnectConfig } from 'ssh2';
-import { getConfig, getServerConfig } from '../config';
 import { ServerConfig, CommandConfig } from '../types';
 import { 
     filterCommandOutput, 
@@ -61,7 +60,10 @@ export class SSHClient {
             return this.client;
         }
 
-        const serverConfig = getServerConfig(this.serverConfig || undefined);
+        if (!this.serverConfig) {
+            throw new Error('未指定服务器配置，无法建立 SSH 连接');
+        }
+        const serverConfig = this.serverConfig;
         const sshConfig: ConnectConfig = {
             host: serverConfig.host,
             port: serverConfig.port,
@@ -133,13 +135,10 @@ export async function executeRemoteCommand(
     
     try {
         const client = await sshClient.connect();
-        const finalServerConfig = serverConfig || (() => {
-            const config = getConfig();
-            if (config.projects && config.projects.length > 0 && config.projects[0].enabled !== false) {
-                return config.projects[0].server;
-            }
-            throw new Error('未配置服务器信息');
-        })();
+        if (!serverConfig) {
+            throw new Error('未指定服务器配置，无法执行命令');
+        }
+        const finalServerConfig = serverConfig;
 
         const includePatterns = commandConfig?.includePatterns || [];
         const excludePatterns = commandConfig?.excludePatterns || [];
