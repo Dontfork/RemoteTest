@@ -23,11 +23,12 @@ jobs:
       - name: Build
         run: npm run package
 
-      - name: Install ovsx
-        run: npm install -g ovsx
-
       - name: Package extension
         run: npx @vscode/vsce package
 
+      - name: Create namespace (if not exists)
+        run: npx ovsx create-namespace RemoteTest -p ${{ secrets.OPEN_VSX_TOKEN }}
+        continue-on-error: true
+
       - name: Publish to Open VSX
-        run: ovsx publish remote-test-*.vsix --pat ${{ secrets.OPEN_VSX_TOKEN }}
+        run: npx ovsx publish remote-test-*.vsix -p ${{ secrets.OPEN_VSX_TOKEN }}
