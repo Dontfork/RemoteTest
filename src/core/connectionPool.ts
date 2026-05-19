@@ -23,6 +23,7 @@ function debugLog(msg: string): void {
 export class ConnectionPool {
     private static instance: ConnectionPool | null = null;
     private connections: Map<string, PooledConnection> = new Map();
+    private connectPromises: Map<string, Promise<SftpClient>> = new Map();
     private cleanupTimer: ReturnType<typeof setInterval> | null = null;
     private readonly IDLE_TIMEOUT = 60000;
     private readonly CLEANUP_INTERVAL = 30000;
@@ -77,22 +78,46 @@ export class ConnectionPool {
             }
         }
 
+        const pending = this.connectPromises.get(key);
+        if (pending) {
+            debugLog(`复用正在创建中的连接: ${key}`);
+            return pending;
+        }
+
         if (this.connections.size >= this.maxConnections) {
             await this.evictOldestConnection();
         }
 
-        const client = new SftpClient();
-        const sftpConfig = this.createSftpConfig(serverConfig);
-        await client.connect(sftpConfig);
+        const connectPromise = this.doConnect(key, serverConfig);
+        this.connectPromises.set(key, connectPromise);
 
-        this.connections.set(key, {
-            client,
-            lastUsed: Date.now(),
-            serverKey: key
-        });
+        try {
+            const client = await connectPromise;
+            return client;
+        } finally {
+            this.connectPromises.delete(key);
+        }
+    }
 
-        debugLog(`新建连接: ${key} (当前连接数: ${this.connections.size})`);
-        return client;
+    private async doConnect(key: string, serverConfig: ServerConfig): Promise<SftpClient> {
+        try {
+            const client = new SftpClient();
+            const sftpConfig = this.createSftpConfig(serverConfig);
+            await client.connect(sftpConfig);
+
+            this.connections.set(key, {
+                client,
+                lastUsed: Date.now(),
+                serverKey: key
+            });
+
+            debugLog(`新建连接: ${key} (当前连接数: ${this.connections.size})`);
+            return client;
+        } catch (error) {
+            this.connections.delete(key);
+            debugLog(`创建连接失败: ${key} (${error})`);
+            throw error;
+        }
     }
 
     private async evictOldestConnection(): Promise<void> {
@@ -180,6 +205,7 @@ export class ConnectionPool {
             clearInterval(this.cleanupTimer);
             this.cleanupTimer = null;
         }
+        this.connectPromises.clear();
         this.releaseAll();
         ConnectionPool.instance = null;
     }
