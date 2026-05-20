@@ -2,7 +2,7 @@
   "name": "remote-test",
   "displayName": "remote-test",
   "description": "实现文件上传、命令执行和日志监控功能",
-  "version": "1.1.3",
+  "version": "1.1.4",
   "publisher": "RemoteTest",
   "engines": {
     "vscode": "^1.85.0"
@@ -218,6 +218,23 @@
         },
         {
           "command": "RemoteTest.syncFile",
+          "group": "RemoteTest@3"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "RemoteTest.runTestCase",
+          "when": "!inSearchEditor",
+          "group": "RemoteTest@1"
+        },
+        {
+          "command": "RemoteTest.uploadFile",
+          "when": "!inSearchEditor",
+          "group": "RemoteTest@2"
+        },
+        {
+          "command": "RemoteTest.syncFile",
+          "when": "!inSearchEditor",
           "group": "RemoteTest@3"
         }
       ],
