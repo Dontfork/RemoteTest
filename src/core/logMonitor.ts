@@ -141,6 +141,8 @@ export class LogMonitor {
         
         this.fetchAllDirectories().then(files => {
             onChange(files);
+        }).catch((error: any) => {
+            log(`初始加载失败: ${error.message}`);
         });
 
         this.startAutoRefresh();
@@ -153,9 +155,13 @@ export class LogMonitor {
         if (interval > 0) {
             log(`启用自动刷新，间隔: ${interval}ms`);
             this.monitorTimer = setInterval(async () => {
-                const files = await this.fetchAllDirectories();
-                if (this.onLogFilesChange) {
-                    this.onLogFilesChange(files);
+                try {
+                    const files = await this.fetchAllDirectories();
+                    if (this.onLogFilesChange) {
+                        this.onLogFilesChange(files);
+                    }
+                } catch (error: any) {
+                    log(`自动刷新失败: ${error.message}`);
                 }
             }, interval);
         } else {
@@ -199,11 +205,17 @@ export class LogMonitor {
                 throw new Error('未指定服务器配置');
             }
             const scpClient = new SCPClient(serverConfig, true, project ?? undefined);
-            await scpClient.downloadFile(logFile.path, localPath);
-            await scpClient.disconnect();
+            try {
+                await scpClient.downloadFile(logFile.path, localPath);
+            } finally {
+                await scpClient.disconnect();
+            }
             return localPath;
         } catch (error: any) {
-            throw new Error(`下载日志失败: ${error.message}`);
+            if (!error.message.startsWith('下载日志失败')) {
+                error.message = `下载日志失败: ${error.message}`;
+            }
+            throw error;
         }
     }
 
@@ -229,6 +241,8 @@ export class LogMonitor {
             if (this.onLogFilesChange) {
                 this.onLogFilesChange(files);
             }
+        }).catch((error: any) => {
+            log(`命令后刷新失败: ${error.message}`);
         });
     }
 }

@@ -294,6 +294,7 @@ export class ChangesTreeView {
             cancellable: false
         }, async (progress) => {
             let completed = 0;
+            const failures: string[] = [];
 
             for (const change of uploadableChanges) {
                 progress.report({
@@ -303,7 +304,7 @@ export class ChangesTreeView {
                 try {
                     await this.uploadSingleChange(change);
                 } catch (error: any) {
-                    vscode.window.showErrorMessage(`上传失败 ${change.relativePath}: ${formatError(error)}`);
+                    failures.push(`${change.relativePath}: ${formatError(error)}`);
                 }
                 completed++;
             }
@@ -321,10 +322,16 @@ export class ChangesTreeView {
                     try {
                         await this.deleteRemoteFile(change);
                     } catch (error: any) {
-                        vscode.window.showErrorMessage(`删除失败 ${displayPath}: ${formatError(error)}`);
+                        failures.push(`删除 ${displayPath}: ${formatError(error)}`);
                     }
                     completed++;
                 }
+            }
+
+            if (failures.length > 0) {
+                vscode.window.showErrorMessage(
+                    `${failures.length} 个文件操作失败，详情请查看输出面板`
+                );
             }
         });
 
@@ -364,6 +371,7 @@ export class ChangesTreeView {
             title: `RemoteTest - 上传 commit ${group.commit.shortHash} 的文件`,
             cancellable: false
         }, async (progress) => {
+            const failures: string[] = [];
             for (let i = 0; i < uploadableFiles.length; i++) {
                 const fileChange = uploadableFiles[i];
                 progress.report({
@@ -373,8 +381,14 @@ export class ChangesTreeView {
                 try {
                     await this.uploadCommitFile(fileChange);
                 } catch (error: any) {
-                    vscode.window.showErrorMessage(`上传失败 ${fileChange.displayPath}: ${formatError(error)}`);
+                    failures.push(`${fileChange.displayPath}: ${formatError(error)}`);
                 }
+            }
+
+            if (failures.length > 0) {
+                vscode.window.showErrorMessage(
+                    `${failures.length} 个文件上传失败，详情请查看输出面板`
+                );
             }
         });
 

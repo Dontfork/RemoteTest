@@ -144,8 +144,6 @@ export class FileUploader {
             }
         } catch (error: any) {
             this.pluginChannel.error(`[错误] ${formatError(error)}`);
-            this.pluginChannel.show();
-            vscode.window.showErrorMessage(`操作失败: ${formatError(error)}`);
             throw error;
         }
     }
@@ -203,8 +201,6 @@ export class FileUploader {
             }
         } catch (error: any) {
             this.pluginChannel.error(`[错误] ${formatError(error)}`);
-            this.pluginChannel.show();
-            vscode.window.showErrorMessage(`操作失败: ${formatError(error)}`);
             throw error;
         }
     }
@@ -224,8 +220,10 @@ export class FileUploader {
         const scpClient = new SCPClient(project.server, true, project);
         try {
             await scpClient.uploadFile(localFilePath, remoteFilePath);
+        } catch (uploadError: any) {
+            throw new Error(`文件上传失败: ${uploadError.message}，远程命令未执行`);
         } finally {
-            await scpClient.disconnect();
+            try { await scpClient.disconnect(); } catch {}
         }
 
         const variables = buildCommandVariables(
@@ -299,7 +297,7 @@ export class FileUploader {
                             await scpClient.uploadFile(file, remotePath);
                         }
                     } finally {
-                        await scpClient.disconnect();
+                        try { await scpClient.disconnect(); } catch {}
                     }
                     
                     vscode.window.setStatusBarMessage(`目录 ${name} 上传完成，共 ${files.length} 个文件`, 3000);
@@ -311,7 +309,7 @@ export class FileUploader {
                     try {
                         await scpClient.uploadFile(localPath, remotePath);
                     } finally {
-                        await scpClient.disconnect();
+                        try { await scpClient.disconnect(); } catch {}
                     }
                     
                     vscode.window.setStatusBarMessage(`文件 ${name} 上传完成`, 3000);
@@ -319,8 +317,6 @@ export class FileUploader {
             });
         } catch (error: any) {
             this.pluginChannel.error(`[上传失败] ${formatError(error)}`);
-            this.pluginChannel.show();
-            vscode.window.showErrorMessage(`上传失败: ${formatError(error)}`);
             throw error;
         }
     }
@@ -373,7 +369,7 @@ export class FileUploader {
                     try {
                         await scpClient.downloadDirectory(remotePath, localPath);
                     } finally {
-                        await scpClient.disconnect();
+                        try { await scpClient.disconnect(); } catch {}
                     }
                     
                     vscode.window.setStatusBarMessage(`目录 ${name} 同步完成`, 3000);
@@ -384,7 +380,7 @@ export class FileUploader {
                     try {
                         await scpClient.downloadFile(remotePath, localPath);
                     } finally {
-                        await scpClient.disconnect();
+                        try { await scpClient.disconnect(); } catch {}
                     }
                     
                     vscode.window.setStatusBarMessage(`文件 ${name} 同步完成`, 3000);
@@ -392,8 +388,6 @@ export class FileUploader {
             });
         } catch (error: any) {
             this.pluginChannel.error(`[同步失败] ${formatError(error)}`);
-            this.pluginChannel.show();
-            vscode.window.showErrorMessage(`同步失败: ${formatError(error)}`);
             throw error;
         }
     }

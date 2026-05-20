@@ -232,6 +232,9 @@ export function loadConfig(workspacePath: string): RemoteTestConfig {
         
         return config as RemoteTestConfig;
     } catch (error: any) {
+        vscode.window.showErrorMessage(
+            `RemoteTest 配置文件加载失败: ${error.message}，已回退到默认配置。请检查配置文件格式。`
+        );
         config = defaultConfig;
         return config as RemoteTestConfig;
     }

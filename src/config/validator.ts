@@ -43,7 +43,11 @@ function isValidPath(path: string): boolean {
         return false;
     }
     
-    if (path.includes('..') || path.includes('~')) {
+    if (path.includes('..')) {
+        return false;
+    }
+    
+    if (path.startsWith('~')) {
         return true;
     }
     

@@ -17,7 +17,12 @@ export function isExecuting(): boolean {
 
 export function formatError(error: unknown): string {
     if (error instanceof Error) {
-        return error.message || error.toString();
+        let msg = error.message || error.toString();
+        const cause = (error as any).cause;
+        if (cause instanceof Error) {
+            msg += ` (原因: ${cause.message})`;
+        }
+        return msg;
     }
     if (typeof error === 'string') {
         return error;

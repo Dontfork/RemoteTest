@@ -200,13 +200,13 @@ export class ConnectionPool {
         this.connections.clear();
     }
 
-    destroy(): void {
+    async destroy(): Promise<void> {
         if (this.cleanupTimer) {
             clearInterval(this.cleanupTimer);
             this.cleanupTimer = null;
         }
         this.connectPromises.clear();
-        this.releaseAll();
+        await this.releaseAll();
         ConnectionPool.instance = null;
     }
 

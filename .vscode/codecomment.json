@@ -1,0 +1,35 @@
+{
+  "server": {
+    "url": "http://localhost:3000",
+    "timeout": 30000,
+    "retryCount": 3
+  },
+  "project": {
+    "id": "proj_1774203479232_0b9ld46x7",
+    "name": "",
+    "gitRepositoryUrl": ""
+  },
+  "display": {
+    "showDecorations": true,
+    "autoRefresh": true,
+    "refreshInterval": 60000,
+    "showLineIcons": true,
+    "confirmOnMigration": true,
+    "commentBackgroundColor": "rgba(6, 182, 212, 0.1)",
+    "displayMode": "hybrid",
+    "defaultCollapsed": true,
+    "autoExpandOnHover": false,
+    "maxPreviewLength": 50,
+    "showReplyCount": true,
+    "enableHoverPreview": true,
+    "enableQuickReply": true,
+    "enableKeyboardNavigation": true,
+    "clickBehavior": "toggle",
+    "fontSize": 12,
+    "fontFamily": "Consolas, 'Courier New', monospace",
+    "lineHeight": 1.5,
+    "padding": 8,
+    "borderRadius": 4,
+    "showAuthorAvatar": false
+  }
+}

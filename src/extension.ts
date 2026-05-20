@@ -100,11 +100,19 @@ export function activate(context: vscode.ExtensionContext) {
         }),
 
         vscode.commands.registerCommand('RemoteTest.downloadLog', async (item: LogTreeItem) => {
-            await logTreeView.downloadLog(item);
+            try {
+                await logTreeView.downloadLog(item);
+            } catch (error: any) {
+                vscode.window.showErrorMessage(`下载日志失败: ${formatError(error)}`);
+            }
         }),
 
         vscode.commands.registerCommand('RemoteTest.openLog', async (item: LogTreeItem) => {
-            await logTreeView.openLogInEditor(item);
+            try {
+                await logTreeView.openLogInEditor(item);
+            } catch (error: any) {
+                vscode.window.showErrorMessage(`打开日志失败: ${formatError(error)}`);
+            }
         }),
 
         vscode.commands.registerCommand('RemoteTest.reloadConfig', () => {
@@ -136,6 +144,7 @@ export function activate(context: vscode.ExtensionContext) {
                         continue;
                     }
                 }
+                vscode.window.showWarningMessage('未找到 RemoteTest 配置文件，请先创建配置文件。');
             } else {
                 vscode.window.setStatusBarMessage('无法打开配置文件：未找到工作区', 3000);
             }
@@ -146,23 +155,43 @@ export function activate(context: vscode.ExtensionContext) {
         }),
 
         vscode.commands.registerCommand('RemoteTest.uploadProjectChanges', async (item: ChangeTreeItem) => {
-            await changesTreeView.uploadProjectChanges(item);
+            try {
+                await changesTreeView.uploadProjectChanges(item);
+            } catch (error: any) {
+                vscode.window.showErrorMessage(`上传变更失败: ${formatError(error)}`);
+            }
         }),
 
         vscode.commands.registerCommand('RemoteTest.uploadSelectedChange', async (item: ChangeTreeItem) => {
-            await changesTreeView.uploadSelectedChange(item);
+            try {
+                await changesTreeView.uploadSelectedChange(item);
+            } catch (error: any) {
+                vscode.window.showErrorMessage(`上传文件失败: ${formatError(error)}`);
+            }
         }),
 
         vscode.commands.registerCommand('RemoteTest.openChangeFile', async (item: ChangeTreeItem) => {
-            await changesTreeView.openChangeFile(item);
+            try {
+                await changesTreeView.openChangeFile(item);
+            } catch (error: any) {
+                vscode.window.showErrorMessage(`打开文件失败: ${formatError(error)}`);
+            }
         }),
 
         vscode.commands.registerCommand('RemoteTest.uploadCommitChanges', async (item: ChangeTreeItem) => {
-            await changesTreeView.uploadCommitChanges(item);
+            try {
+                await changesTreeView.uploadCommitChanges(item);
+            } catch (error: any) {
+                vscode.window.showErrorMessage(`上传 commit 变更失败: ${formatError(error)}`);
+            }
         }),
 
         vscode.commands.registerCommand('RemoteTest.uploadCommitFileChange', async (item: ChangeTreeItem) => {
-            await changesTreeView.uploadCommitFileChange(item);
+            try {
+                await changesTreeView.uploadCommitFileChange(item);
+            } catch (error: any) {
+                vscode.window.showErrorMessage(`上传文件失败: ${formatError(error)}`);
+            }
         }),
 
         vscode.commands.registerCommand('RemoteTest.refreshQuickCommands', async () => {
@@ -170,7 +199,11 @@ export function activate(context: vscode.ExtensionContext) {
         }),
 
         vscode.commands.registerCommand('RemoteTest.executeQuickCommand', async (item: QuickCommandItem) => {
-            await quickCommandsTreeView.executeQuickCommand(item);
+            try {
+                await quickCommandsTreeView.executeQuickCommand(item);
+            } catch (error: any) {
+                vscode.window.showErrorMessage(`命令执行失败: ${formatError(error)}`);
+            }
         })
     ];
 
@@ -181,13 +214,13 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.window.setStatusBarMessage('RemoteTest 插件已启动', 3000);
 }
 
-export function deactivate() {
+export async function deactivate(): Promise<void> {
     if (logTreeView) {
         logTreeView.stop();
     }
     if (commandExecutor) {
         commandExecutor.dispose();
     }
-    ConnectionPool.getInstance().destroy();
+    await ConnectionPool.getInstance().destroy();
     disposeConfig();
 }

@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { QuickCommandDetector } from '../core/quickCommandDetector';
 import { QuickCommand, QuickCommandGroup } from '../types';
-import { executeRemoteCommand, isExecuting } from '../core/sshClient';
+import { executeRemoteCommand, isExecuting, formatError } from '../core/sshClient';
 import { getOutputChannelManager, UnifiedOutputChannel } from '../utils/outputChannel';
 import { getConfig } from '../config';
 
@@ -142,7 +142,7 @@ export class QuickCommandsTreeView {
                 vscode.window.setStatusBarMessage(`命令 "${cmd.name}" 执行完成`, 3000);
             }, 100);
         } catch (error: any) {
-            vscode.window.showErrorMessage(`命令执行失败: ${error.message}`);
+            vscode.window.showErrorMessage(`命令执行失败: ${formatError(error)}`);
         }
     }
 }
