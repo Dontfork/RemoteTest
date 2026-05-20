@@ -126,17 +126,20 @@ export class SSHClient {
         return new Promise((resolve, reject) => {
             const newClient = new Client();
             
+            const onError = (err: Error) => {
+                this.connected = false;
+                this.client = null;
+                reject(new Error(`SSH 连接失败: ${err.message}`));
+            };
+
             newClient.on('ready', () => {
+                newClient.removeListener('error', onError);
                 this.client = newClient;
                 this.connected = true;
                 resolve(newClient);
             });
 
-            newClient.on('error', (err) => {
-                this.connected = false;
-                this.client = null;
-                reject(new Error(`SSH 连接失败: ${err.message}`));
-            });
+            newClient.on('error', onError);
 
             newClient.on('close', () => {
                 this.connected = false;
@@ -171,7 +174,7 @@ export interface ExecuteResult {
     filteredOutput: string;
 }
 
-const COMMAND_TIMEOUT_MS = 5 * 60 * 1000;
+const COMMAND_TIMEOUT_MS = 2 * 60 * 1000;
 
 let commandTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
 
@@ -224,13 +227,36 @@ export async function executeRemoteCommand(
             commandTimeoutHandle = setTimeout(() => {
                 settle(() => {
                     if (outputChannel) {
-                        outputChannel.error('└─ 命令执行超时 (5分钟) — 已强制终止');
+                        outputChannel.error('└─ 命令执行超时 (2分钟) — 已强制终止');
                         outputChannel.show();
                     }
                     sshClient.disconnect();
                     reject(new Error(`命令执行超时 (${COMMAND_TIMEOUT_MS / 1000}秒): ${command}`));
                 });
             }, COMMAND_TIMEOUT_MS);
+
+            client.on('close', () => {
+                settle(() => {
+                    if (outputChannel) {
+                        outputChannel.error('└─ SSH 连接已断开');
+                        outputChannel.show();
+                    }
+                    const combinedOutput = stdout + stderr;
+                    const cleanOutput = stripAnsiEscapeCodes(combinedOutput);
+                    const filteredOutput = filterCommandOutput(cleanOutput, includePatterns, excludePatterns);
+                    reject(new Error('SSH 连接已断开，命令执行中断'));
+                });
+            });
+
+            client.on('error', (clientErr) => {
+                settle(() => {
+                    if (outputChannel) {
+                        outputChannel.error(`└─ SSH 连接错误: ${clientErr.message}`);
+                        outputChannel.show();
+                    }
+                    reject(new Error(`SSH 连接错误: ${clientErr.message}`));
+                });
+            });
 
             const fullCommand = finalServerConfig.remoteDirectory 
                 ? `cd ${finalServerConfig.remoteDirectory} && ${command}`
