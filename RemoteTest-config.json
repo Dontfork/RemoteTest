@@ -44,7 +44,7 @@
         "downloadPath": "D:\\downloads\\projectA"
       },
       "textFileExtensions": [],
-      "commitCount": 0
+      "commitCount": 1
     },
     {
       "name": "项目B",
@@ -80,10 +80,10 @@
         "downloadPath": "D:\\downloads\\projectB"
       },
       "textFileExtensions": [],
-      "commitCount": 0
+      "commitCount": 1
     }
   ],
   "refreshInterval": 0,
   "useLogOutputChannel": true,
-  "commitCount": 0
+  "commitCount": 1
 }

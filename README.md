@@ -66,14 +66,14 @@
         "downloadPath": "D:\\downloads\\logs"
       },
       "textFileExtensions": [],
-      "commitCount": 5
+      "commitCount": 1
     }
   ],
   "refreshInterval": 0,
   "useLogOutputChannel": true,
   "textFileExtensions": [],
   "logViewer": "",
-  "commitCount": 5
+  "commitCount": 1
 }
 ```
 
@@ -101,7 +101,7 @@
 | `refreshInterval` | 日志刷新间隔（毫秒），0为禁用 | 5000 |
 | `useLogOutputChannel` | 测试输出通道类型 | true |
 | `logViewer` | 自定义日志查看程序路径（为空时使用VSCode打开） | "notepad.exe" |
-| `commitCount` | 显示最近 N 个 commit 的变更文件，0=禁用（项目级优先于全局） | 5 |
+| `commitCount` | 显示最近 N 个 commit 的变更文件，默认 1（设为 0 禁用，项目级优先于全局） | 1 |
 | `textFileExtensions` | 额外文本文件扩展名（上传时作为文本处理，项目级与全局合并） | [".cxx"] |
 
 > **提示**：

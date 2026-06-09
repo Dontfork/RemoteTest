@@ -42,14 +42,14 @@ const defaultConfig: RemoteTestConfig = {
                 downloadPath: "D:\\downloads\\logs"
             },
             textFileExtensions: [],
-            commitCount: 0
+            commitCount: 1
         }
     ],
     refreshInterval: 0,
     useLogOutputChannel: true,
     textFileExtensions: [],
     logViewer: "",
-    commitCount: 0
+    commitCount: 1
 };
 
 function deepMerge<T>(target: T, source: Partial<T>): T {
@@ -224,7 +224,7 @@ export function loadConfig(workspacePath: string): RemoteTestConfig {
                 clearOutputBeforeRun: finalConfig.clearOutputBeforeRun ?? true,
                 useLogOutputChannel: finalConfig.useLogOutputChannel ?? true,
                 logViewer: finalConfig.logViewer ?? "",
-                commitCount: finalConfig.commitCount ?? 0
+                commitCount: finalConfig.commitCount ?? 1
             };
         } else {
             vscode.window.showErrorMessage('配置文件格式错误：缺少 projects 数组，请检查配置文件格式');
@@ -257,7 +257,7 @@ export function getUseLogOutputChannel(): boolean {
 
 export function getCommitCount(): number {
     const currentConfig = getConfig();
-    return currentConfig.commitCount ?? 0;
+    return currentConfig.commitCount ?? 1;
 }
 
 export function getProjectCommitCount(project: ProjectConfig): number {
