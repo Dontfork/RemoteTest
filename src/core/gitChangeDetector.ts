@@ -473,18 +473,21 @@ export class GitChangeDetector {
             return groups;
         } catch (error: any) {
             this.outputChannel.error(`[${project.name}] 获取 commit 记录错误: ${error.message}`);
+            vscode.window.setStatusBarMessage(`[${project.name}] 获取 commit 记录失败: ${error.message}`, 5000);
             return [];
         }
     }
 
+    // 用 RS (Record Separator, ASCII 30) 替代 null 字节，避免 Windows cmd.exe 截断
+    private static readonly COMMIT_FIELD_SEP = '\x1e';
+
     private async getRecentCommits(localPath: string, count: number): Promise<CommitInfo[]> {
         const { stdout } = await execAsync(
-            `git log -${count} --format="%H%x00%h%x00%s%x00%an%x00%ai%x00" --no-merges`,
+            `git log -${count} --format="%H%x1e%h%x1e%s%x1e%an%x1e%ai" --no-merges`,
             {
                 cwd: localPath,
                 maxBuffer: 1024 * 1024 * 10,
-                encoding: 'utf8',
-                env: { ...process.env, LANG: 'C.UTF-8' }
+                encoding: 'utf8'
             }
         );
 
@@ -493,16 +496,19 @@ export class GitChangeDetector {
         }
 
         const commits: CommitInfo[] = [];
-        const entries = stdout.trim().split('\x00');
+        const lines = stdout.trim().split('\n');
 
-        for (let i = 0; i + 4 < entries.length; i += 5) {
-            commits.push({
-                hash: entries[i],
-                shortHash: entries[i + 1],
-                message: entries[i + 2],
-                author: entries[i + 3],
-                date: entries[i + 4]
-            });
+        for (const line of lines) {
+            const parts = line.split(GitChangeDetector.COMMIT_FIELD_SEP);
+            if (parts.length >= 5) {
+                commits.push({
+                    hash: parts[0],
+                    shortHash: parts[1],
+                    message: parts[2],
+                    author: parts[3],
+                    date: parts[4]
+                });
+            }
         }
 
         return commits;
@@ -514,8 +520,7 @@ export class GitChangeDetector {
             {
                 cwd: localPath,
                 maxBuffer: 1024 * 1024 * 10,
-                encoding: 'utf8',
-                env: { ...process.env, LANG: 'C.UTF-8' }
+                encoding: 'utf8'
             }
         );
 
