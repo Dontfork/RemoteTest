@@ -174,7 +174,7 @@ export interface ExecuteResult {
     filteredOutput: string;
 }
 
-const COMMAND_TIMEOUT_MS = 2 * 60 * 1000;
+const COMMAND_TIMEOUT_MS = 10 * 60 * 1000;
 
 let commandTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
 
@@ -235,28 +235,12 @@ export async function executeRemoteCommand(
                 });
             }, COMMAND_TIMEOUT_MS);
 
-            client.on('close', () => {
+            if (!sshClient.isConnected()) {
                 settle(() => {
-                    if (outputChannel) {
-                        outputChannel.error('└─ SSH 连接已断开');
-                        outputChannel.show();
-                    }
-                    const combinedOutput = stdout + stderr;
-                    const cleanOutput = stripAnsiEscapeCodes(combinedOutput);
-                    const filteredOutput = filterCommandOutput(cleanOutput, includePatterns, excludePatterns);
-                    reject(new Error('SSH 连接已断开，命令执行中断'));
+                    reject(new Error('SSH 连接已断开，无法执行命令'));
                 });
-            });
-
-            client.on('error', (clientErr) => {
-                settle(() => {
-                    if (outputChannel) {
-                        outputChannel.error(`└─ SSH 连接错误: ${clientErr.message}`);
-                        outputChannel.show();
-                    }
-                    reject(new Error(`SSH 连接错误: ${clientErr.message}`));
-                });
-            });
+                return;
+            }
 
             const fullCommand = finalServerConfig.remoteDirectory 
                 ? `cd ${finalServerConfig.remoteDirectory} && ${command}`
@@ -282,9 +266,7 @@ export async function executeRemoteCommand(
                     return;
                 }
 
-                stream.on('close', (code: number, signal: string) => {
-                    exitCode = code;
-                    
+                const finish = (code: number) => {
                     settle(() => {
                         if (outputChannel) {
                             if (code === 0) {
@@ -299,9 +281,24 @@ export async function executeRemoteCommand(
                         const cleanOutput = stripAnsiEscapeCodes(combinedOutput);
                         const filteredOutput = filterCommandOutput(cleanOutput, includePatterns, excludePatterns);
                         
-                        resolve({ stdout, stderr, code: exitCode, filteredOutput });
+                        resolve({ stdout, stderr, code, filteredOutput });
                         sshClient.disconnect();
                     });
+                };
+
+                // exit 事件是命令真正的结束信号（包含真实退出码），优先使用
+                stream.on('exit', (code: number, signal: string) => {
+                    if (!settled) {
+                        exitCode = code;
+                        finish(code);
+                    }
+                });
+
+                // close 作为兜底：如果 exit 没触发（极少见），close 也能结束
+                stream.on('close', () => {
+                    if (!settled) {
+                        finish(exitCode || 0);
+                    }
                 });
 
                 stream.on('error', (streamErr: Error) => {

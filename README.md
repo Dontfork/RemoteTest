@@ -64,13 +64,16 @@
           }
         ],
         "downloadPath": "D:\\downloads\\logs"
-      }
+      },
+      "textFileExtensions": [],
+      "commitCount": 5
     }
   ],
   "refreshInterval": 0,
   "useLogOutputChannel": true,
   "textFileExtensions": [],
-  "logViewer": ""
+  "logViewer": "",
+  "commitCount": 5
 }
 ```
 
@@ -97,8 +100,9 @@
 | **全局配置** | | |
 | `refreshInterval` | 日志刷新间隔（毫秒），0为禁用 | 5000 |
 | `useLogOutputChannel` | 测试输出通道类型 | true |
-| `textFileExtensions` | 额外文本文件扩展名（上传时作为文本处理） | [".txt", ".json"] |
 | `logViewer` | 自定义日志查看程序路径（为空时使用VSCode打开） | "notepad.exe" |
+| `commitCount` | 显示最近 N 个 commit 的变更文件，0=禁用（项目级优先于全局） | 5 |
+| `textFileExtensions` | 额外文本文件扩展名（上传时作为文本处理，项目级与全局合并） | [".cxx"] |
 
 > **提示**：
 > - `useLogOutputChannel`: true=LogOutputChannel（支持日志级别），false=OutputChannel
@@ -190,8 +194,10 @@
 
 1. 点击活动栏的 **remote-test** 图标
 2. 选择 **修改监控**
-3. 查看所有有变更的文件
+3. 查看所有未提交的 Git 变更文件
 4. 右键单个文件或整个项目进行上传
+
+> **Commit 记录功能**：配置 `commitCount` 后，修改监控还会展示最近 N 个 commit 的变更文件列表，支持按 commit 或按单个文件一键上传。
 
 ### 快捷命令
 

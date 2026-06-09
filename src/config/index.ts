@@ -203,7 +203,8 @@ export function loadConfig(workspacePath: string): RemoteTestConfig {
             const { hasConflict, conflicts } = checkPathConflict(loadedConfig.projects);
             if (hasConflict) {
                 vscode.window.showErrorMessage(
-                    `配置警告：检测到工程路径冲突\n${conflicts.join('\n')}\n自动禁用冲突的工程配置，请修正配置文件。`
+                    `配置警告：检测到工程路径冲突\n${conflicts.join('\n')}\n\n自动禁用冲突的工程配置，请修正配置文件。`,
+                    { modal: true }
                 );
             }
             
