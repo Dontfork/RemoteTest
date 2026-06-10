@@ -1,9 +1,10 @@
 {
-  "name": "remote-test",
-  "displayName": "remote-test",
+  "name": "remotetest",
+  "displayName": "RemoteTest",
   "description": "实现文件上传、命令执行和日志监控功能",
-  "version": "1.2.5",
-  "publisher": "RemoteTest",
+  "version": "1.2.7",
+  "publisher": "YiEvan",
+  "icon": "resources/logo.png",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -12,7 +13,7 @@
   ],
   "activationEvents": [
     "onStartupFinished",
-    "onView:remote-test-view",
+    "onView:remotetest-view",
     "onView:RemoteTestLogs",
     "onView:RemoteTestChanges",
     "onView:RemoteTestQuickCommands"
@@ -22,14 +23,14 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "remote-test-view",
-          "title": "remote-test",
+          "id": "remotetest-view",
+          "title": "remotetest",
           "icon": "resources/icon.svg"
         }
       ]
     },
     "views": {
-      "remote-test-view": [
+      "remotetest-view": [
         {
           "id": "RemoteTestLogs",
           "name": "日志监控"

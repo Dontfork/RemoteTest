@@ -64,3 +64,46 @@ npm test
 - [ ] `src/core/commandExecutor.ts` - 实现功能
 - [ ] `doc/commandExecutor.md` - 更新模块文档
 - [ ] `test/suite/commandExecutor.test.ts` - 添加测试用例
+
+## 版本发布流程
+
+当用户要求"提交代码并发布新版本"时，按以下步骤执行：
+
+### 1. 修改版本号
+
+在 `package.json` 中递增 `version` 字段（patch 级别，如 `1.2.4` → `1.2.5`）
+
+### 2. 提交代码
+
+```powershell
+git add <相关文件> package.json
+git commit -m "fix/feat: 简要描述 (v版本号)"
+```
+
+### 3. 打标签
+
+```powershell
+git tag v版本号
+```
+
+### 4. 编译和打包
+
+```powershell
+npm run compile
+npm run package
+npx vsce package
+```
+
+### 5. 推送到远程（触发 GitHub Actions 发布）
+
+```powershell
+git push
+git push --tags
+```
+
+### 注意事项
+
+- PowerShell 中 `&&` 不是有效分隔符，用 `;` 代替
+- commit message 末尾带版本号，如 `(v1.2.5)`
+- 推送 tags 会触发 GitHub Actions 自动发布到 VS Code Marketplace
+- 不要遗漏 `git push --tags`，否则不会触发发布

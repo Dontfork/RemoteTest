@@ -5,8 +5,6 @@
 .gitattributes
 
 DEVELOPMENT.md
-README.md
-readme.md
 
 src/**
 test/**
@@ -27,4 +25,5 @@ node_modules/**
 
 doc/**
 *.md
+!README.md
 !LICENSE
