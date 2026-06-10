@@ -28,6 +28,7 @@ jobs:
 
       - name: Create namespace (if not exists)
         run: npx ovsx create-namespace YiEvan -p ${{ secrets.OPEN_VSX_TOKEN }}
+        continue-on-error: true
 
       - name: Publish to Open VSX
         run: npx ovsx publish remotetest-*.vsix -p ${{ secrets.OPEN_VSX_TOKEN }}
