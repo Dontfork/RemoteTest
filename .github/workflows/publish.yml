@@ -27,8 +27,7 @@ jobs:
         run: npx @vscode/vsce package
 
       - name: Create namespace (if not exists)
-        run: npx ovsx create-namespace RemoteTest -p ${{ secrets.OPEN_VSX_TOKEN }}
-        continue-on-error: true
+        run: npx ovsx create-namespace YiEvan -p ${{ secrets.OPEN_VSX_TOKEN }}
 
       - name: Publish to Open VSX
-        run: npx ovsx publish remote-test-*.vsix -p ${{ secrets.OPEN_VSX_TOKEN }}
+        run: npx ovsx publish remotetest-*.vsix -p ${{ secrets.OPEN_VSX_TOKEN }}
