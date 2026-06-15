@@ -2,7 +2,7 @@
   "name": "remotetest",
   "displayName": "RemoteTest",
   "description": "实现文件上传、命令执行和日志监控功能",
-  "version": "1.2.7",
+  "version": "1.2.8",
   "publisher": "YiEvan",
   "icon": "resources/logo.png",
   "engines": {
