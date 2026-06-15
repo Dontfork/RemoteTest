@@ -267,12 +267,11 @@
   "scripts": {
     "vscode:prepublish": "npm run package",
     "compile": "tsc -p ./",
-    "compile:test": "tsc -p ./test",
     "watch": "tsc -watch -p ./",
     "package": "webpack --mode production",
     "webpack-dev": "webpack --mode development",
-    "test": "npm run compile && npm run compile:test && node ./out/test/runTest.js",
-    "test:unit": "mocha --require ts-node/register 'test/suite/*.test.ts'"
+    "test": "npm run test:unit",
+    "test:unit": "mocha --require ts-node/register 'test/unit/*.test.ts'"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.6",
@@ -280,7 +279,6 @@
     "@types/ssh2": "^1.15.5",
     "@types/ssh2-sftp-client": "^9.0.6",
     "@types/vscode": "^1.85.0",
-    "@vscode/test-electron": "^2.3.8",
     "mocha": "^10.2.0",
     "ts-loader": "^9.5.4",
     "ts-node": "^10.9.2",
@@ -289,8 +287,6 @@
     "webpack-cli": "^6.0.1"
   },
   "dependencies": {
-    "axios": "^1.6.5",
-    "marked": "^17.0.2",
     "ssh2": "^1.17.0",
     "ssh2-sftp-client": "^12.0.1"
   },

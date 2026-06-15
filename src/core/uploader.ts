@@ -4,7 +4,9 @@ import * as path from 'path';
 import { getConfig, matchProject, hasValidLocalPath, hasValidRemoteDirectory } from '../config';
 import { SCPClient } from './scpClient';
 import { CommandExecutor, replaceCommandVariables, buildCommandVariables } from './commandExecutor';
-import { executeRemoteCommand, isExecuting, formatError } from './sshClient';
+import { executeRemoteCommand, isExecuting } from './sshClient';
+import { formatError } from '../pure/errors';
+import { calculateRemotePath } from '../pure/pathUtil';
 import { ProjectConfig, CommandConfig } from '../types';
 import { UnifiedOutputChannel } from '../utils/outputChannel';
 
@@ -24,28 +26,16 @@ export class FileUploader {
         this.onTestCaseComplete = callback;
     }
 
-    private calculateRemotePath(localFilePath: string, project: ProjectConfig): string {
+    private calculateRemotePathForFile(localFilePath: string, project: ProjectConfig): string {
         if (!hasValidLocalPath(project)) {
             throw new Error(`工程 "${project.name}" 未配置 localPath，无法进行文件上传`);
         }
-        
+
         if (!hasValidRemoteDirectory(project)) {
             throw new Error(`工程 "${project.name}" 未配置 remoteDirectory，无法进行文件上传`);
         }
 
-        const normalizedLocalPath = path.normalize(localFilePath);
-        const normalizedProjectPath = path.normalize(project.localPath!);
-
-        if (normalizedLocalPath.toLowerCase() !== normalizedProjectPath.toLowerCase() &&
-            !normalizedLocalPath.toLowerCase().startsWith(normalizedProjectPath.toLowerCase() + path.sep)) {
-            throw new Error(`文件路径 "${localFilePath}" 不在工程路径 "${project.localPath}" 内`);
-        }
-
-        const relativePath = path.relative(normalizedProjectPath, normalizedLocalPath);
-        const posixRelativePath = relativePath.split(path.sep).join(path.posix.sep);
-        const remotePath = path.posix.join(project.server.remoteDirectory!, posixRelativePath);
-
-        return remotePath;
+        return calculateRemotePath(localFilePath, project.localPath!, project.server.remoteDirectory!);
     }
 
     private async selectCommand(commands: CommandConfig[]): Promise<CommandConfig | undefined> {
@@ -67,9 +57,15 @@ export class FileUploader {
         return selected?.command;
     }
 
-    async runTestCase(localPath: string): Promise<void> {
+    /**
+     * 运行测试用例（自动选择 runnable 命令或使用指定命令）。
+     *
+     * @param localPath 本地文件/目录路径
+     * @param explicitCommand 指定命令（不传则从项目 runnable 命令中选择）
+     */
+    async runTestCase(localPath: string, explicitCommand?: CommandConfig): Promise<void> {
         const project = matchProject(localPath);
-        
+
         if (!project) {
             vscode.window.showErrorMessage(
                 `未找到匹配的工程配置\n文件路径: ${localPath}\n请在配置文件中添加对应的工程配置。`
@@ -77,68 +73,70 @@ export class FileUploader {
             return;
         }
 
-        if (!project.commands || project.commands.length === 0) {
-            vscode.window.setStatusBarMessage('该工程未配置命令，无法运行用例', 3000);
-            return;
-        }
+        let command: CommandConfig | undefined = explicitCommand;
 
-        const availableCommands = project.commands.filter(cmd => cmd.runnable === true);
-        
-        if (availableCommands.length === 0) {
-            vscode.window.setStatusBarMessage('可用命令数量为 0，无法运行用例。请将需要运行的命令设置为 runnable: true。', 4000);
-            return;
+        // 未指定命令时，从项目的 runnable 命令中选取
+        if (!command) {
+            if (!project.commands || project.commands.length === 0) {
+                vscode.window.setStatusBarMessage('该工程未配置命令，无法运行用例', 3000);
+                return;
+            }
+
+            const availableCommands = project.commands.filter(cmd => cmd.runnable === true);
+
+            if (availableCommands.length === 0) {
+                vscode.window.setStatusBarMessage('可用命令数量为 0，无法运行用例。请将需要运行的命令设置为 runnable: true。', 4000);
+                return;
+            }
+
+            command = await this.selectCommand(availableCommands);
+            if (!command) {
+                vscode.window.setStatusBarMessage('已取消操作', 2000);
+                return;
+            }
         }
 
         const stat = fs.statSync(localPath);
         const isDirectory = stat.isDirectory();
         const name = path.basename(localPath);
+        const progressTitle = explicitCommand
+            ? `RemoteTest - ${project.name} - ${command.name}`
+            : `RemoteTest - ${project.name}`;
 
         try {
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
-                title: `RemoteTest - ${project.name}`,
+                title: progressTitle,
                 cancellable: false
             }, async (progress) => {
                 if (isDirectory) {
                     progress.report({ message: `正在扫描目录: ${name}` });
                     const files = this.getAllFiles(localPath);
-                    
+
                     if (files.length === 0) {
                         vscode.window.setStatusBarMessage(`目录 ${name} 中没有可上传的文件`, 3000);
                         return;
                     }
 
-                    const command = await this.selectCommand(availableCommands);
-                    if (!command) {
-                        vscode.window.setStatusBarMessage('已取消操作', 2000);
-                        return;
-                    }
-
                     progress.report({ message: `发现 ${files.length} 个文件，开始处理...` });
-                    
+
                     for (let i = 0; i < files.length; i++) {
                         const file = files[i];
                         const fileName = path.basename(file);
                         progress.report({ message: `处理文件 (${i + 1}/${files.length}): ${fileName}` });
-                        await this.runSingleTestCase(file, project, command);
-                    }
-                    
-                    vscode.window.setStatusBarMessage(`目录 ${name} 处理完成，共 ${files.length} 个文件`, 3000);
-                } else {
-                    const command = await this.selectCommand(availableCommands);
-                    if (!command) {
-                        vscode.window.setStatusBarMessage('已取消操作', 2000);
-                        return;
+                        await this.runSingleTestCase(file, project, command!);
                     }
 
+                    vscode.window.setStatusBarMessage(`目录 ${name} 处理完成，共 ${files.length} 个文件`, 3000);
+                } else {
                     progress.report({ message: `正在处理: ${name}` });
-                    await this.runSingleTestCase(localPath, project, command);
+                    await this.runSingleTestCase(localPath, project, command!);
                     vscode.window.setStatusBarMessage(`文件 ${name} 运行完成`, 3000);
                 }
             });
 
             this.testOutputChannel.show();
-            
+
             if (this.onTestCaseComplete) {
                 this.onTestCaseComplete();
             }
@@ -148,61 +146,9 @@ export class FileUploader {
         }
     }
 
+    /** 向后兼容：使用指定命令运行测试用例。 */
     async runTestCaseWithCommand(localPath: string, command: CommandConfig): Promise<void> {
-        const project = matchProject(localPath);
-        
-        if (!project) {
-            vscode.window.showErrorMessage(
-                `未找到匹配的工程配置\n文件路径: ${localPath}\n请在配置文件中添加对应的工程配置。`
-            );
-            return;
-        }
-
-        const stat = fs.statSync(localPath);
-        const isDirectory = stat.isDirectory();
-        const name = path.basename(localPath);
-
-        try {
-            await vscode.window.withProgress({
-                location: vscode.ProgressLocation.Notification,
-                title: `RemoteTest - ${project.name} - ${command.name}`,
-                cancellable: false
-            }, async (progress) => {
-                if (isDirectory) {
-                    progress.report({ message: `正在扫描目录: ${name}` });
-                    const files = this.getAllFiles(localPath);
-                    
-                    if (files.length === 0) {
-                        vscode.window.setStatusBarMessage(`目录 ${name} 中没有可上传的文件`, 3000);
-                        return;
-                    }
-
-                    progress.report({ message: `发现 ${files.length} 个文件，开始处理...` });
-                    
-                    for (let i = 0; i < files.length; i++) {
-                        const file = files[i];
-                        const fileName = path.basename(file);
-                        progress.report({ message: `处理文件 (${i + 1}/${files.length}): ${fileName}` });
-                        await this.runSingleTestCase(file, project, command);
-                    }
-                    
-                    vscode.window.setStatusBarMessage(`目录 ${name} 处理完成，共 ${files.length} 个文件`, 3000);
-                } else {
-                    progress.report({ message: `正在处理: ${name}` });
-                    await this.runSingleTestCase(localPath, project, command);
-                    vscode.window.setStatusBarMessage(`文件 ${name} 运行完成`, 3000);
-                }
-            });
-
-            this.testOutputChannel.show();
-            
-            if (this.onTestCaseComplete) {
-                this.onTestCaseComplete();
-            }
-        } catch (error: any) {
-            this.pluginChannel.error(`[错误] ${formatError(error)}`);
-            throw error;
-        }
+        return this.runTestCase(localPath, command);
     }
 
     private async runSingleTestCase(
@@ -215,7 +161,7 @@ export class FileUploader {
             return;
         }
 
-        const remoteFilePath = this.calculateRemotePath(localFilePath, project);
+        const remoteFilePath = this.calculateRemotePathForFile(localFilePath, project);
 
         const scpClient = new SCPClient(project.server, true, project);
         try {
@@ -293,7 +239,7 @@ export class FileUploader {
                             const fileName = path.basename(file);
                             progress.report({ message: `上传文件 (${i + 1}/${files.length}): ${fileName}` });
                             
-                            const remotePath = this.calculateRemotePath(file, project);
+                            const remotePath = this.calculateRemotePathForFile(file, project);
                             await scpClient.uploadFile(file, remotePath);
                         }
                     } finally {
@@ -304,7 +250,7 @@ export class FileUploader {
                 } else {
                     progress.report({ message: `正在上传: ${name}` });
                     
-                    const remotePath = this.calculateRemotePath(localPath, project);
+                    const remotePath = this.calculateRemotePathForFile(localPath, project);
                     const scpClient = new SCPClient(project.server, true, project);
                     try {
                         await scpClient.uploadFile(localPath, remotePath);
@@ -360,7 +306,7 @@ export class FileUploader {
                 title: `RemoteTest - ${project.name} - 同步文件`,
                 cancellable: false
             }, async (progress) => {
-                const remotePath = this.calculateRemotePath(localPath, project);
+                const remotePath = this.calculateRemotePathForFile(localPath, project);
                 
                 if (isDirectory) {
                     progress.report({ message: `正在同步目录: ${name}` });

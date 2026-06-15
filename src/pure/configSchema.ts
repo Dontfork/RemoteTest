@@ -1,4 +1,123 @@
-import { RemoteTestConfig, ProjectConfig, ServerConfig } from '../types';
+/**
+ * 配置 schema、校验与默认值填充（纯逻辑，不依赖 vscode）
+ *
+ * 从 config/index.ts（defaultConfig/deepMerge/checkPathConflict）与
+ * config/validator.ts（VALID_KEYS / REQUIRED_FIELDS / validateConfig / fillMissingFields）抽出。
+ */
+import * as path from 'path';
+import {
+    RemoteTestConfig,
+    ProjectConfig
+} from '../types';
+import { normalizePath, isValidPath, isValidHost, isValidPort } from './pathUtil';
+
+/* -------------------------------------------------------------------------- */
+/* 默认配置                                                                     */
+/* -------------------------------------------------------------------------- */
+
+export const defaultConfig: RemoteTestConfig = {
+    projects: [
+        {
+            name: "我的测试项目",
+            localPath: "",
+            enabled: true,
+            server: {
+                host: "192.168.1.100",
+                port: 22,
+                username: "root",
+                password: "",
+                privateKeyPath: "",
+                remoteDirectory: "/home/user/project"
+            },
+            commands: [
+                {
+                    name: "运行测试",
+                    executeCommand: "pytest {filePath} -v",
+                    runnable: true,
+                    clearOutputBeforeRun: true,
+                    includePatterns: [],
+                    excludePatterns: []
+                }
+            ],
+            logs: {
+                directories: [
+                    { name: "应用日志", path: "/var/log/app" }
+                ],
+                downloadPath: "D:\\downloads\\logs"
+            },
+            textFileExtensions: [],
+            commitCount: 1
+        }
+    ],
+    refreshInterval: 0,
+    useLogOutputChannel: true,
+    textFileExtensions: [],
+    logViewer: "",
+    commitCount: 1
+};
+
+/** 浅深合并对象（不展开数组，不合并 undefined）。 */
+export function deepMerge<T>(target: T, source: Partial<T>): T {
+    const result = { ...target };
+    for (const key in source) {
+        if (source[key] !== undefined) {
+            if (
+                typeof source[key] === 'object' &&
+                source[key] !== null &&
+                !Array.isArray(source[key]) &&
+                typeof target[key] === 'object' &&
+                target[key] !== null
+            ) {
+                result[key] = deepMerge(target[key], source[key] as any);
+            } else {
+                result[key] = source[key] as any;
+            }
+        }
+    }
+    return result;
+}
+
+/**
+ * 检测工程之间的路径包含冲突，并自动禁用冲突工程。
+ *
+ * 返回冲突描述列表；同时会就地修改 `projects` 中冲突工程的 enabled=false。
+ */
+export function checkPathConflict(projects: ProjectConfig[]): { hasConflict: boolean; conflicts: string[] } {
+    const conflicts: string[] = [];
+    const enabledProjects: ProjectConfig[] = [];
+
+    for (const project of projects) {
+        if (!project.localPath) {
+            continue;
+        }
+
+        const normalizedPath = normalizePath(project.localPath);
+
+        for (const existing of enabledProjects) {
+            if (!existing.localPath) {
+                continue;
+            }
+            const existingPath = normalizePath(existing.localPath);
+
+            if (normalizedPath.startsWith(existingPath + path.sep) ||
+                existingPath.startsWith(normalizedPath + path.sep)) {
+                conflicts.push(`工程 "${project.name}" (${project.localPath}) 与工程 "${existing.name}" (${existing.localPath}) 存在路径包含关系`);
+                project.enabled = false;
+                break;
+            }
+        }
+
+        if (project.enabled !== false) {
+            enabledProjects.push(project);
+        }
+    }
+
+    return { hasConflict: conflicts.length > 0, conflicts };
+}
+
+/* -------------------------------------------------------------------------- */
+/* 校验                                                                         */
+/* -------------------------------------------------------------------------- */
 
 export interface ConfigValidationResult {
     isValid: boolean;
@@ -16,93 +135,34 @@ export interface MissingField {
     defaultValue: any;
 }
 
-const VALID_ROOT_KEYS = ['projects', 'refreshInterval', 'textFileExtensions', 'clearOutputBeforeRun', 'useLogOutputChannel', 'logViewer', 'commitCount'];
+export const VALID_ROOT_KEYS = ['projects', 'refreshInterval', 'textFileExtensions', 'clearOutputBeforeRun', 'useLogOutputChannel', 'logViewer', 'commitCount'];
 
-const VALID_PROJECT_KEYS = ['name', 'localPath', 'enabled', 'server', 'commands', 'logs', 'textFileExtensions', 'commitCount'];
+export const VALID_PROJECT_KEYS = ['name', 'localPath', 'enabled', 'server', 'commands', 'logs', 'textFileExtensions', 'commitCount'];
 
-const VALID_SERVER_KEYS = ['host', 'port', 'username', 'password', 'privateKeyPath', 'remoteDirectory'];
+export const VALID_SERVER_KEYS = ['host', 'port', 'username', 'password', 'privateKeyPath', 'remoteDirectory'];
 
-const VALID_COMMAND_KEYS = ['name', 'executeCommand', 'includePatterns', 'excludePatterns', 'runnable', 'clearOutputBeforeRun'];
+export const VALID_COMMAND_KEYS = ['name', 'executeCommand', 'includePatterns', 'excludePatterns', 'runnable', 'clearOutputBeforeRun'];
 
-const VALID_LOGS_KEYS = ['directories', 'downloadPath'];
+export const VALID_LOGS_KEYS = ['directories', 'downloadPath'];
 
-const VALID_LOG_DIRECTORY_KEYS = ['name', 'path'];
+export const VALID_LOG_DIRECTORY_KEYS = ['name', 'path'];
 
-const REQUIRED_PROJECT_FIELDS = [
+export const REQUIRED_PROJECT_FIELDS = [
     { path: 'name', field: 'name', defaultValue: '未命名工程' },
 ];
 
-const REQUIRED_SERVER_FIELDS = [
+export const REQUIRED_SERVER_FIELDS = [
     { path: 'server.host', field: 'host', defaultValue: '' },
     { path: 'server.port', field: 'port', defaultValue: 22 },
     { path: 'server.username', field: 'username', defaultValue: '' },
 ];
-
-function isValidPath(path: string): boolean {
-    if (!path || typeof path !== 'string') {
-        return false;
-    }
-    
-    if (path.includes('..')) {
-        return false;
-    }
-    
-    if (path.startsWith('~')) {
-        return true;
-    }
-    
-    const windowsPathRegex = /^[a-zA-Z]:\\/;
-    const posixPathRegex = /^\//;
-    
-    return windowsPathRegex.test(path) || posixPathRegex.test(path);
-}
-
-function isValidHost(host: string): boolean {
-    if (!host || typeof host !== 'string') {
-        return false;
-    }
-    
-    const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
-    const ipv6Regex = /^\[?([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}\]?$/;
-    const hostnameRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-    
-    if (ipv4Regex.test(host)) {
-        const parts = host.split('.');
-        return parts.every(part => {
-            const num = parseInt(part, 10);
-            return num >= 0 && num <= 255;
-        });
-    }
-    
-    return ipv6Regex.test(host) || hostnameRegex.test(host);
-}
-
-function isValidPort(port: any): boolean {
-    if (typeof port !== 'number') {
-        return false;
-    }
-    return Number.isInteger(port) && port > 0 && port <= 65535;
-}
-
-function isValidUrl(url: string): boolean {
-    if (!url || typeof url !== 'string') {
-        return false;
-    }
-    
-    try {
-        new URL(url);
-        return true;
-    } catch {
-        return false;
-    }
-}
 
 function checkUnknownKeys(obj: any, validKeys: string[], path: string): string[] {
     const unknownKeys: string[] = [];
     if (!obj || typeof obj !== 'object' || Array.isArray(obj)) {
         return unknownKeys;
     }
-    
+
     for (const key of Object.keys(obj)) {
         if (!validKeys.includes(key)) {
             unknownKeys.push(`${path}.${key}`);
@@ -111,6 +171,13 @@ function checkUnknownKeys(obj: any, validKeys: string[], path: string): string[]
     return unknownKeys;
 }
 
+export { isValidPath, isValidHost, isValidPort };
+
+/**
+ * 校验配置对象，返回错误/警告/缺失字段/未知字段。
+ *
+ * 与原 config/validator.ts 行为逐行等价。
+ */
 export function validateConfig(config: any): ConfigValidationResult {
     const errors: string[] = [];
     const warnings: string[] = [];
@@ -348,6 +415,7 @@ export function validateConfig(config: any): ConfigValidationResult {
     };
 }
 
+/** 按缺失字段路径补齐默认值，并补全结构化字段（commands/logs/enabled/refreshInterval）。 */
 export function fillMissingFields(config: any, missingFields: MissingField[]): any {
     const result = JSON.parse(JSON.stringify(config));
 
@@ -358,11 +426,11 @@ export function fillMissingFields(config: any, missingFields: MissingField[]): a
         for (let i = 0; i < pathParts.length - 1; i++) {
             const part = pathParts[i];
             const arrayMatch = part.match(/^(\w+)\[(\d+)\]$/);
-            
+
             if (arrayMatch) {
                 const arrayName = arrayMatch[1];
                 const arrayIndex = parseInt(arrayMatch[2], 10);
-                
+
                 if (!current[arrayName]) {
                     current[arrayName] = [];
                 }
@@ -380,11 +448,11 @@ export function fillMissingFields(config: any, missingFields: MissingField[]): a
 
         const lastPart = pathParts[pathParts.length - 1];
         const lastArrayMatch = lastPart.match(/^(\w+)\[(\d+)\]$/);
-        
+
         if (lastArrayMatch) {
             const arrayName = lastArrayMatch[1];
             const arrayIndex = parseInt(lastArrayMatch[2], 10);
-            
+
             if (!current[arrayName]) {
                 current[arrayName] = [];
             }

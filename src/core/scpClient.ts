@@ -5,49 +5,8 @@ import { getConfig } from '../config';
 import { LogFile, ProjectConfig, ServerConfig } from '../types';
 import { ConnectionPool } from './connectionPool';
 import { createSSHAuthConfig } from '../utils/auth';
+import { isTextFile, convertCrlfToLf } from '../pure/textFile';
 
-const DEFAULT_TEXT_FILE_EXTENSIONS = [
-    '.txt', '.md', '.json', '.xml', '.html', '.css', '.js', '.ts', '.jsx', '.tsx',
-    '.py', '.java', '.c', '.cpp', '.h', '.hpp', '.cs', '.go', '.rs', '.rb', '.php',
-    '.sh', '.bash', '.zsh', '.yml', '.yaml', '.toml', '.ini', '.conf', '.cfg',
-    '.sql', '.vue', '.svelte', '.scss', '.sass', '.less', '.env', '.gitignore',
-    '.dockerignore', '.editorconfig', '.eslintrc', '.prettierrc', '.babelrc',
-    '.properties', '.gradle', '.m', '.swift', '.kt', '.scala', '.lua', '.pl',
-    '.r', '.rmd', '.csv', '.tsv', '.log', '.awk', '.sed'
-];
-
-const DEFAULT_TEXT_FILE_NAMES = [
-    '.gitignore', '.dockerignore', '.editorconfig', '.eslintrc', '.prettierrc',
-    '.babelrc', 'license', 'readme', 'changelog', 'makefile', 'dockerfile',
-    'vagrantfile', 'gemfile', 'rakefile', 'procfile'
-];
-
-function isTextFile(filePath: string, customExtensions?: string[]): boolean {
-    const ext = path.extname(filePath).toLowerCase();
-    
-    const allExtensions = customExtensions 
-        ? [...DEFAULT_TEXT_FILE_EXTENSIONS, ...customExtensions.map(e => {
-            const lower = e.toLowerCase();
-            return lower.startsWith('.') ? lower : '.' + lower;
-        })]
-        : DEFAULT_TEXT_FILE_EXTENSIONS;
-    
-    if (allExtensions.includes(ext)) {
-        return true;
-    }
-    
-    const fileName = path.basename(filePath).toLowerCase();
-    if (DEFAULT_TEXT_FILE_NAMES.some(name => fileName === name || fileName.startsWith(name + '.'))) {
-        return true;
-    }
-    return false;
-}
-
-function convertCrlfToLf(content: Buffer): Buffer {
-    const text = content.toString('utf8');
-    const converted = text.replace(/\r\n/g, '\n');
-    return Buffer.from(converted, 'utf8');
-}
 
 export class SCPClient {
     private serverConfig: ServerConfig | null = null;

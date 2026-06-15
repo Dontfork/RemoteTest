@@ -1,65 +1,28 @@
 import * as vscode from 'vscode';
 import { Client, ConnectConfig } from 'ssh2';
 import { ServerConfig, CommandConfig } from '../types';
-import { 
-    filterCommandOutput, 
+import {
+    filterCommandOutput,
     stripAnsiEscapeCodes,
-    matchPattern
-} from '../utils/outputFilter';
+    matchPattern,
+    getLogLevel
+} from '../pure/outputFilter';
 import { UnifiedOutputChannel } from '../utils/outputChannel';
 import { createSSHAuthConfig } from '../utils/auth';
+import { CommandLock } from '../services/CommandLock';
 
-let isCommandExecuting = false;
+
+
+/** 全局命令执行锁（向后兼容）。新代码建议注入 CommandLock 实例。 */
+const globalCommandLock = new CommandLock();
 
 export function isExecuting(): boolean {
-    return isCommandExecuting;
+    return globalCommandLock.isExecuting();
 }
 
-export function formatError(error: unknown): string {
-    if (error instanceof Error) {
-        let msg = error.message || error.toString();
-        const cause = (error as any).cause;
-        if (cause instanceof Error) {
-            msg += ` (原因: ${cause.message})`;
-        }
-        return msg;
-    }
-    if (typeof error === 'string') {
-        return error;
-    }
-    try {
-        return JSON.stringify(error);
-    } catch {
-        return String(error);
-    }
-}
-
-export function fullErrorMessage(error: unknown): string {
-    if (error instanceof Error) {
-        const parts: string[] = [error.message || error.toString()];
-        if (error.stack) {
-            parts.push(`\n--- 堆栈 ---\n${error.stack}`);
-        }
-        return parts.join('');
-    }
-    return formatError(error);
-}
-
-function getLogLevel(line: string): 'info' | 'warn' | 'error' | 'trace' {
-    const lowerLine = line.toLowerCase();
-    if (lowerLine.includes('[error]') || lowerLine.includes('[err]') || 
-        lowerLine.includes('error:') || lowerLine.includes('exception') ||
-        lowerLine.includes('failed') || lowerLine.includes('failure')) {
-        return 'error';
-    }
-    if (lowerLine.includes('[warn]') || lowerLine.includes('[warning]') ||
-        lowerLine.includes('warn:') || lowerLine.includes('warning:')) {
-        return 'warn';
-    }
-    if (lowerLine.includes('[debug]') || lowerLine.includes('[trace]')) {
-        return 'trace';
-    }
-    return 'info';
+/** 获取全局命令锁实例（用于 DI 场景）。 */
+export function getGlobalCommandLock(): CommandLock {
+    return globalCommandLock;
 }
 
 function shouldExcludeLine(line: string, excludePatterns: string[]): boolean {
@@ -178,14 +141,6 @@ const COMMAND_TIMEOUT_MS = 10 * 60 * 1000;
 
 let commandTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
 
-function clearCommandLock(): void {
-    isCommandExecuting = false;
-    if (commandTimeoutHandle) {
-        clearTimeout(commandTimeoutHandle);
-        commandTimeoutHandle = null;
-    }
-}
-
 export async function executeRemoteCommand(
     command: string,
     outputChannel?: UnifiedOutputChannel,
@@ -193,11 +148,10 @@ export async function executeRemoteCommand(
     commandConfig?: Partial<CommandConfig>,
     clearOutput?: boolean
 ): Promise<ExecuteResult> {
-    if (isCommandExecuting) {
+    if (!globalCommandLock.tryAcquire()) {
         throw new Error('当前有命令正在执行中，请等待执行完成后再试');
     }
-    
-    isCommandExecuting = true;
+
     const sshClient = new SSHClient(serverConfig);
     
     try {
@@ -219,7 +173,11 @@ export async function executeRemoteCommand(
             const settle = (fn: () => void) => {
                 if (!settled) {
                     settled = true;
-                    clearCommandLock();
+                    if (commandTimeoutHandle) {
+                        clearTimeout(commandTimeoutHandle);
+                        commandTimeoutHandle = null;
+                    }
+                    globalCommandLock.release();
                     fn();
                 }
             };
@@ -374,10 +332,8 @@ export async function executeRemoteCommand(
             });
         });
     } catch (error) {
-        clearCommandLock();
+        globalCommandLock.release();
         await sshClient.disconnect();
         throw error;
     }
 }
-
-export { filterCommandOutput, stripAnsiEscapeCodes } from '../utils/outputFilter';

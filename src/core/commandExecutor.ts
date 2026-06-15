@@ -1,36 +1,14 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
 import { getConfig } from '../config';
 import { executeRemoteCommand, isExecuting } from './sshClient';
 import { CommandConfig, CommandVariables, ServerConfig } from '../types';
 import { getOutputChannelManager, UnifiedOutputChannel } from '../utils/outputChannel';
+import {
+    replaceCommandVariables,
+    buildCommandVariables
+} from '../pure/commandVariables';
 
-export function replaceCommandVariables(command: string, variables: CommandVariables): string {
-    return command
-        .replace(/{filePath}/g, variables.filePath)
-        .replace(/{fileName}/g, variables.fileName)
-        .replace(/{fileDir}/g, variables.fileDir)
-        .replace(/{localPath}/g, variables.localPath)
-        .replace(/{localDir}/g, variables.localDir)
-        .replace(/{localFileName}/g, variables.localFileName)
-        .replace(/{remoteDir}/g, variables.remoteDir);
-}
-
-export function buildCommandVariables(
-    localFilePath: string,
-    remoteFilePath: string,
-    remoteDir: string
-): CommandVariables {
-    return {
-        filePath: remoteFilePath,
-        fileName: path.posix.basename(remoteFilePath),
-        fileDir: path.posix.dirname(remoteFilePath),
-        localPath: localFilePath,
-        localDir: path.dirname(localFilePath),
-        localFileName: path.basename(localFilePath),
-        remoteDir: remoteDir
-    };
-}
+export { replaceCommandVariables, buildCommandVariables };
 
 export class CommandExecutor {
     private pluginChannel: UnifiedOutputChannel;

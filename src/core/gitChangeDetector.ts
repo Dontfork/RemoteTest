@@ -6,14 +6,19 @@ import { promisify } from 'util';
 import { GitChange, GitChangeGroup, GitChangeType, ProjectConfig, CommitInfo, CommitChangeGroup, CommitFileChange, ProjectChangeData } from '../types';
 import { getProjectsWithLocalPath, getProjectCommitCount } from '../config';
 import { getOutputChannelManager, UnifiedOutputChannel } from '../utils/outputChannel';
+import {
+    RawGitChange,
+    parseGitStatusOutput,
+    parseDiffTreeOutput,
+    parseRecentCommits,
+    calculateSimilarity,
+    classifyRename,
+    COMMIT_FIELD_SEP,
+    GIT_LOG_FORMAT
+} from '../pure/gitParser';
+import { toDisplayPath } from '../pure/pathUtil';
 
 const execAsync = promisify(exec);
-
-interface RawGitChange {
-    filePath: string;
-    changeType: GitChangeType;
-    oldFilePath?: string;
-}
 
 export class GitChangeDetector {
     private outputChannel: UnifiedOutputChannel;
@@ -100,17 +105,8 @@ export class GitChangeDetector {
                 return [];
             }
 
-            const lines = statusOutput.trim().split('\n');
-            
-            const rawChanges: RawGitChange[] = [];
-            
-            for (const line of lines) {
-                const rawChange = this.parseGitStatusLineToRaw(line);
-                if (rawChange) {
-                    rawChanges.push(rawChange);
-                }
-            }
-            
+            const rawChanges = parseGitStatusOutput(statusOutput);
+
             const changes: GitChange[] = [];
             
             for (const rawChange of rawChanges) {
@@ -120,7 +116,7 @@ export class GitChangeDetector {
                 
                 if (!isDir) {
                     const relativePath = path.relative(localPath, absolutePath);
-                    const displayPath = this.getDisplayPath(relativePath);
+                    const displayPath = toDisplayPath(relativePath);
 
                     const change: GitChange = {
                         path: absolutePath,
@@ -201,14 +197,11 @@ export class GitChangeDetector {
         const result: GitChange[] = [...otherFiles];
 
         for (const pair of renamedPairs) {
-            const oldDir = path.dirname(pair.deleted.relativePath);
-            const newDir = path.dirname(pair.added.relativePath);
-            
-            const isMoved = oldDir !== newDir;
-            
+            const renameType = classifyRename(pair.deleted.relativePath, pair.added.relativePath);
+
             const renamedChange: GitChange = {
                 ...pair.added,
-                type: isMoved ? 'moved' : 'renamed',
+                type: renameType,
                 oldPath: pair.deleted.path,
                 oldRelativePath: pair.deleted.relativePath
             };
@@ -230,21 +223,6 @@ export class GitChangeDetector {
         return result;
     }
 
-    private async calculateFileSimilarity(filePath1: string, filePath2: string): Promise<number> {
-        try {
-            const content1 = await this.getFileContent(filePath1);
-            const content2 = await this.getFileContent(filePath2);
-
-            if (!content1 || !content2) {
-                return 0;
-            }
-
-            return this.calculateSimilarity(content1, content2);
-        } catch {
-            return 0;
-        }
-    }
-
     private async calculateSimilarityByContent(content1: string, filePath2: string): Promise<number> {
         try {
             const content2 = await this.getFileContent(filePath2);
@@ -253,32 +231,10 @@ export class GitChangeDetector {
                 return 0;
             }
 
-            return this.calculateSimilarity(content1, content2);
+            return calculateSimilarity(content1, content2);
         } catch {
             return 0;
         }
-    }
-
-    private calculateSimilarity(content1: string, content2: string): number {
-        const lines1 = content1.split('\n');
-        const lines2 = content2.split('\n');
-
-        const set1 = new Set(lines1.map(l => l.trim()).filter(l => l.length > 0));
-        const set2 = new Set(lines2.map(l => l.trim()).filter(l => l.length > 0));
-
-        if (set1.size === 0 || set2.size === 0) {
-            return 0;
-        }
-
-        let commonLines = 0;
-        for (const line of set1) {
-            if (set2.has(line)) {
-                commonLines++;
-            }
-        }
-
-        const similarity = (2 * commonLines) / (set1.size + set2.size);
-        return similarity;
     }
 
     private async getFileContent(filePath: string): Promise<string> {
@@ -302,63 +258,6 @@ export class GitChangeDetector {
         }
     }
 
-    private parseGitStatusLineToRaw(line: string): RawGitChange | null {
-        if (line.length < 3) {
-            return null;
-        }
-
-        const xStatus = line[0];
-        const yStatus = line[1];
-        
-        let filePath: string;
-        
-        if (line[2] === ' ') {
-            filePath = line.substring(3).trim();
-        } else {
-            filePath = line.substring(2).trim();
-        }
-        
-        if (!filePath) {
-            return null;
-        }
-
-        let oldFilePath: string | undefined;
-
-        if (filePath.startsWith('"') && filePath.endsWith('"')) {
-            filePath = filePath.slice(1, -1);
-        }
-
-        if (filePath.includes(' -> ')) {
-            const parts = filePath.split(' -> ');
-            oldFilePath = parts[0];
-            filePath = parts[1];
-            
-            if (oldFilePath.startsWith('"') && oldFilePath.endsWith('"')) {
-                oldFilePath = oldFilePath.slice(1, -1);
-            }
-            
-            if (filePath.startsWith('"') && filePath.endsWith('"')) {
-                filePath = filePath.slice(1, -1);
-            }
-            
-            if (!filePath) {
-                return null;
-            }
-        }
-
-        const changeType = this.determineChangeType(xStatus, yStatus);
-
-        return {
-            filePath: filePath,
-            changeType: changeType,
-            oldFilePath: oldFilePath
-        };
-    }
-
-    private getDisplayPath(relativePath: string): string {
-        return relativePath.replace(/\\/g, '/');
-    }
-
     private async isDirectory(absolutePath: string, changeType: GitChangeType, originalPath: string): Promise<boolean> {
         if (originalPath.endsWith('/') || originalPath.endsWith('\\')) {
             return true;
@@ -378,19 +277,6 @@ export class GitChangeDetector {
             
             return !(ext && ext.length > 0);
         }
-    }
-
-    private determineChangeType(x: string, y: string): GitChangeType {
-        if (x === 'D' || y === 'D') {
-            return 'deleted';
-        }
-        if (x === 'A' || y === 'A' || x === '?' || y === '?') {
-            return 'added';
-        }
-        if (x === 'R' || y === 'R') {
-            return 'renamed';
-        }
-        return 'modified';
     }
 
     async getDeletedFiles(): Promise<GitChange[]> {
@@ -478,12 +364,9 @@ export class GitChangeDetector {
         }
     }
 
-    // 用 RS (Record Separator, ASCII 30) 替代 null 字节，避免 Windows cmd.exe 截断
-    private static readonly COMMIT_FIELD_SEP = '\x1e';
-
     private async getRecentCommits(localPath: string, count: number): Promise<CommitInfo[]> {
         const { stdout } = await execAsync(
-            `git log -${count} --format="%H%x1e%h%x1e%s%x1e%an%x1e%ai" --no-merges`,
+            `git log -${count} --format="${GIT_LOG_FORMAT}" --no-merges`,
             {
                 cwd: localPath,
                 maxBuffer: 1024 * 1024 * 10,
@@ -491,27 +374,7 @@ export class GitChangeDetector {
             }
         );
 
-        if (!stdout.trim()) {
-            return [];
-        }
-
-        const commits: CommitInfo[] = [];
-        const lines = stdout.trim().split('\n');
-
-        for (const line of lines) {
-            const parts = line.split(GitChangeDetector.COMMIT_FIELD_SEP);
-            if (parts.length >= 5) {
-                commits.push({
-                    hash: parts[0],
-                    shortHash: parts[1],
-                    message: parts[2],
-                    author: parts[3],
-                    date: parts[4]
-                });
-            }
-        }
-
-        return commits;
+        return parseRecentCommits(stdout);
     }
 
     private async getCommitFileChanges(commit: CommitInfo, project: ProjectConfig, localPath: string): Promise<CommitFileChange[]> {
@@ -524,69 +387,13 @@ export class GitChangeDetector {
             }
         );
 
-        if (!stdout.trim()) {
-            return [];
-        }
-
-        const changes: CommitFileChange[] = [];
-        const lines = stdout.trim().split('\n');
-
-        for (const line of lines) {
-            const parts = line.split('\t');
-            if (parts.length < 2) {
-                continue;
-            }
-
-            const status = parts[0].trim();
-            let filePath = parts[1].trim();
-            let oldFilePath: string | undefined;
-
-            if (filePath.startsWith('"') && filePath.endsWith('"')) {
-                filePath = filePath.slice(1, -1);
-            }
-
-            if (parts.length >= 3) {
-                oldFilePath = parts[1].trim();
-                filePath = parts[2].trim();
-                if (oldFilePath.startsWith('"') && oldFilePath.endsWith('"')) {
-                    oldFilePath = oldFilePath.slice(1, -1);
-                }
-                if (filePath.startsWith('"') && filePath.endsWith('"')) {
-                    filePath = filePath.slice(1, -1);
-                }
-            }
-
-            const changeType = this.parseDiffTreeStatus(status);
-            const relativePath = filePath.replace(/\\/g, '/');
-            const displayPath = relativePath;
-
-            const change: CommitFileChange = {
-                relativePath: relativePath,
-                displayPath: displayPath,
-                type: changeType,
-                project: project
-            };
-
-            changes.push(change);
-        }
-
-        return changes;
-    }
-
-    private parseDiffTreeStatus(status: string): GitChangeType {
-        if (status.startsWith('A')) {
-            return 'added';
-        }
-        if (status.startsWith('D')) {
-            return 'deleted';
-        }
-        if (status.startsWith('R')) {
-            return 'renamed';
-        }
-        if (status.startsWith('C')) {
-            return 'added';
-        }
-        return 'modified';
+        const parsed = parseDiffTreeOutput(stdout);
+        return parsed.map(p => ({
+            relativePath: p.relativePath,
+            displayPath: p.relativePath,
+            type: p.type,
+            project: project
+        }));
     }
 
     showDebugLog(): void {

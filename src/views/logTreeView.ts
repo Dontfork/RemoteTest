@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
-import { LogMonitor, formatSize, formatDate } from '../core';
+import { LogMonitor } from '../core/logMonitor';
+import { formatSize, formatDate } from '../pure/format';
 import { LogFile, LogDirectoryConfig, ProjectConfig } from '../types';
 import { getEnabledProjects, getConfig } from '../config';
 import { getOutputChannelManager } from '../utils/outputChannel';

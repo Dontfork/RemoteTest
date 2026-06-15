@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
-import { ConfigValidationResult } from './validator';
+import { ConfigValidationResult } from '../pure/configSchema';
 import { getOutputChannelManager } from '../utils/outputChannel';
 
 export function showValidationMessages(result: ConfigValidationResult): void {

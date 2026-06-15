@@ -6,6 +6,9 @@ import { SCPClient } from './scpClient';
 import { ConnectionPool } from './connectionPool';
 import { LogFile, LogDirectoryConfig, ProjectConfig, ServerConfig } from '../types';
 import { getOutputChannelManager } from '../utils/outputChannel';
+import { formatSize, formatDate } from '../pure/format';
+
+export { formatSize, formatDate };
 
 function log(message: string): void {
     const channel = getOutputChannelManager().getRemoteTestChannel();
@@ -244,34 +247,5 @@ export class LogMonitor {
         }).catch((error: any) => {
             log(`命令后刷新失败: ${error.message}`);
         });
-    }
-}
-
-export function formatSize(bytes: number): string {
-    let result: string;
-    if (!bytes || bytes < 0) {
-        result = '0 B';
-    } else if (bytes < 1024) {
-        result = bytes + ' B';
-    } else if (bytes < 1048576) {
-        result = (bytes / 1024).toFixed(1) + ' KB';
-    } else if (bytes < 1073741824) {
-        result = (bytes / 1048576).toFixed(1) + ' MB';
-    } else {
-        result = (bytes / 1073741824).toFixed(2) + ' GB';
-    }
-    return result.padStart(8);
-}
-
-export function formatDate(date: Date): string {
-    try {
-        const d = new Date(date);
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        const hour = String(d.getHours()).padStart(2, '0');
-        const minute = String(d.getMinutes()).padStart(2, '0');
-        return `${month}-${day} ${hour}:${minute}`;
-    } catch {
-        return '';
     }
 }

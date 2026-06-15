@@ -4,9 +4,9 @@ import * as fs from 'fs';
 import { GitChangeDetector } from '../core/gitChangeDetector';
 import { GitChange, GitChangeType, CommitChangeGroup, CommitFileChange, ProjectChangeData } from '../types';
 import { FileUploader } from '../core/uploader';
-import { SCPClient } from '../core/scpClient';
+import { ChangesUploadService } from '../services/ChangesUploadService';
 import { hasValidRemoteDirectory, hasValidLocalPath } from '../config';
-import { formatError } from '../core/sshClient';
+import { formatError } from '../pure/errors';
 
 function getChangeTypeLabel(type: GitChangeType): string {
     switch (type) {
@@ -205,16 +205,20 @@ export class ChangesTreeProvider implements vscode.TreeDataProvider<ChangeTreeIt
     }
 }
 
+/**
+ * 变更树视图 —— 只负责 UI 交互（确认对话框、进度展示、Tree 刷新）。
+ * 实际的上传/删除操作委托给 ChangesUploadService。
+ */
 export class ChangesTreeView {
     private treeProvider: ChangesTreeProvider;
     private treeView: vscode.TreeView<ChangeTreeItem>;
     private gitDetector: GitChangeDetector;
-    private fileUploader: FileUploader;
+    private uploadService: ChangesUploadService;
 
     constructor(fileUploader: FileUploader) {
         this.gitDetector = new GitChangeDetector();
         this.treeProvider = new ChangesTreeProvider(this.gitDetector);
-        this.fileUploader = fileUploader;
+        this.uploadService = new ChangesUploadService(fileUploader);
         this.treeView = vscode.window.createTreeView('RemoteTestChanges', {
             treeDataProvider: this.treeProvider,
             showCollapseAll: true
@@ -235,13 +239,9 @@ export class ChangesTreeView {
         const data = item.changeGroup;
         const project = data.project;
 
-        if (!hasValidLocalPath(project)) {
-            vscode.window.setStatusBarMessage(`工程 "${project.name}" 未配置 localPath，无法进行文件上传`, 4000);
-            return;
-        }
-
-        if (!hasValidRemoteDirectory(project)) {
-            vscode.window.setStatusBarMessage(`工程 "${project.name}" 未配置 remoteDirectory，无法进行文件上传`, 4000);
+        const validation = this.uploadService.canUpload(project);
+        if (!validation.ok) {
+            vscode.window.setStatusBarMessage(validation.reason!, 4000);
             return;
         }
 
@@ -269,7 +269,7 @@ export class ChangesTreeView {
         }
 
         if (filesToDelete.length > 0) {
-            const deleteMessage = this.formatDeletedFilesMessage(filesToDelete);
+            const deleteMessage = this.uploadService.formatDeletedFilesMessage(filesToDelete);
             const choice = await vscode.window.showWarningMessage(
                 `项目 ${data.projectName} 检测到 ${filesToDelete.length} 个需要删除的远程文件：\n${deleteMessage}\n\n（包括 ${deletedChanges.length} 个已删除文件和 ${renamedChanges.length} 个重命名文件的旧路径）\n\n是否同步删除远程服务器上的对应文件？`,
                 { modal: true },
@@ -302,7 +302,7 @@ export class ChangesTreeView {
                 });
 
                 try {
-                    await this.uploadSingleChange(change);
+                    await this.uploadService.uploadSingleChange(change);
                 } catch (error: any) {
                     failures.push(`${change.relativePath}: ${formatError(error)}`);
                 }
@@ -320,7 +320,7 @@ export class ChangesTreeView {
                     });
 
                     try {
-                        await this.deleteRemoteFile(change);
+                        await this.uploadService.deleteRemoteFile(change);
                     } catch (error: any) {
                         failures.push(`删除 ${displayPath}: ${formatError(error)}`);
                     }
@@ -335,7 +335,7 @@ export class ChangesTreeView {
             }
         });
 
-        const summary = this.buildUploadSummary(uploadableChanges.length, deletedChanges.length, renamedChanges.length, shouldDeleteRemote);
+        const summary = this.uploadService.buildUploadSummary(uploadableChanges.length, deletedChanges.length, renamedChanges.length, shouldDeleteRemote);
         vscode.window.setStatusBarMessage(summary, 4000);
         this.refresh();
     }
@@ -349,13 +349,9 @@ export class ChangesTreeView {
         const group = item.commitGroup;
         const project = group.project;
 
-        if (!hasValidLocalPath(project)) {
-            vscode.window.setStatusBarMessage(`工程 "${project.name}" 未配置 localPath，无法进行文件上传`, 4000);
-            return;
-        }
-
-        if (!hasValidRemoteDirectory(project)) {
-            vscode.window.setStatusBarMessage(`工程 "${project.name}" 未配置 remoteDirectory，无法进行文件上传`, 4000);
+        const validation = this.uploadService.canUpload(project);
+        if (!validation.ok) {
+            vscode.window.setStatusBarMessage(validation.reason!, 4000);
             return;
         }
 
@@ -379,7 +375,7 @@ export class ChangesTreeView {
                 });
 
                 try {
-                    await this.uploadCommitFile(fileChange);
+                    await this.uploadService.uploadCommitFile(fileChange);
                 } catch (error: any) {
                     failures.push(`${fileChange.displayPath}: ${formatError(error)}`);
                 }
@@ -403,22 +399,18 @@ export class ChangesTreeView {
 
         const project = item.change.project;
 
-        if (!hasValidLocalPath(project)) {
-            vscode.window.setStatusBarMessage(`工程 "${project.name}" 未配置 localPath，无法进行文件上传`, 4000);
-            return;
-        }
-
-        if (!hasValidRemoteDirectory(project)) {
-            vscode.window.setStatusBarMessage(`工程 "${project.name}" 未配置 remoteDirectory，无法进行文件上传`, 4000);
+        const validation = this.uploadService.canUpload(project);
+        if (!validation.ok) {
+            vscode.window.setStatusBarMessage(validation.reason!, 4000);
             return;
         }
 
         try {
             if (item.change.type === 'deleted') {
-                await this.deleteRemoteFile(item.change);
+                await this.uploadService.deleteRemoteFile(item.change);
                 vscode.window.setStatusBarMessage(`已删除远程文件: ${item.change.relativePath}`, 3000);
             } else {
-                await this.uploadSingleChange(item.change);
+                await this.uploadService.uploadSingleChange(item.change);
 
                 if ((item.change.type === 'renamed' || item.change.type === 'moved') && item.change.oldRelativePath) {
                     const changeTypeLabel = item.change.type === 'moved' ? '移动' : '重命名';
@@ -435,7 +427,7 @@ export class ChangesTreeView {
                             path: item.change.oldPath!,
                             type: 'deleted'
                         };
-                        await this.deleteRemoteFile(oldChange);
+                        await this.uploadService.deleteRemoteFile(oldChange);
                         vscode.window.setStatusBarMessage(`已删除远程旧文件: ${item.change.oldRelativePath}`, 3000);
                     }
                 } else {
@@ -458,13 +450,9 @@ export class ChangesTreeView {
         const fileChange = item.commitFileChange;
         const project = fileChange.project;
 
-        if (!hasValidLocalPath(project)) {
-            vscode.window.setStatusBarMessage(`工程 "${project.name}" 未配置 localPath，无法进行文件上传`, 4000);
-            return;
-        }
-
-        if (!hasValidRemoteDirectory(project)) {
-            vscode.window.setStatusBarMessage(`工程 "${project.name}" 未配置 remoteDirectory，无法进行文件上传`, 4000);
+        const validation = this.uploadService.canUpload(project);
+        if (!validation.ok) {
+            vscode.window.setStatusBarMessage(validation.reason!, 4000);
             return;
         }
 
@@ -474,7 +462,7 @@ export class ChangesTreeView {
         }
 
         try {
-            await this.uploadCommitFile(fileChange);
+            await this.uploadService.uploadCommitFile(fileChange);
             vscode.window.setStatusBarMessage(`文件 ${fileChange.displayPath} 上传成功`, 3000);
         } catch (error: any) {
             vscode.window.showErrorMessage(`上传失败: ${formatError(error)}`);
@@ -492,80 +480,5 @@ export class ChangesTreeView {
         } catch (error: any) {
             vscode.window.showErrorMessage(`无法打开文件: ${formatError(error)}`);
         }
-    }
-
-    private async uploadCommitFile(fileChange: CommitFileChange): Promise<void> {
-        const project = fileChange.project;
-        if (!project.localPath) {
-            throw new Error(`工程 "${project.name}" 未配置 localPath，无法上传文件`);
-        }
-        const localPath = path.resolve(project.localPath, fileChange.relativePath);
-
-        if (!fs.existsSync(localPath)) {
-            throw new Error(`本地文件不存在: ${localPath}`);
-        }
-
-        await this.fileUploader.uploadFile(localPath);
-    }
-
-    private buildUploadSummary(uploadCount: number, deleteCount: number, renameCount: number, shouldDeleteRemote: boolean): string {
-        let summary = `变更处理完成: 上传 ${uploadCount} 个文件`;
-        if (shouldDeleteRemote && (deleteCount > 0 || renameCount > 0)) {
-            const totalDeleted = deleteCount + renameCount;
-            summary += `，删除 ${totalDeleted} 个远程文件`;
-            if (renameCount > 0) {
-                summary += ` (含 ${renameCount} 个重命名旧文件)`;
-            }
-        }
-        return summary;
-    }
-
-    private async uploadSingleChange(change: GitChange): Promise<void> {
-        await this.fileUploader.uploadFile(change.path);
-    }
-
-    private async deleteRemoteFile(change: GitChange): Promise<void> {
-        const project = change.project;
-        const remotePath = this.calculateRemotePath(change);
-
-        const scpClient = new SCPClient(project.server, true, project);
-        try {
-            const sftp = await scpClient.connect();
-
-            try {
-                await sftp.delete(remotePath);
-            } catch (deleteError: any) {
-                try {
-                    await sftp.rmdir(remotePath, true);
-                } catch (rmdirError: any) {
-                    throw new Error(`无法删除远程文件: ${deleteError.message}`);
-                }
-            }
-        } finally {
-            await scpClient.disconnect();
-        }
-    }
-
-    private calculateRemotePath(change: GitChange): string {
-        const project = change.project;
-        const relativePath = change.relativePath.replace(/\\/g, '/');
-        return path.posix.join(project.server.remoteDirectory!, relativePath);
-    }
-
-    private formatDeletedFilesMessage(changes: GitChange[]): string {
-        const maxDisplay = 5;
-        const displayChanges = changes.slice(0, maxDisplay);
-        let message = displayChanges.map(c => {
-            if (c.type === 'deleted') {
-                return `  - ${c.relativePath} (已删除)`;
-            }
-            return `  - ${c.relativePath} (重命名旧文件)`;
-        }).join('\n');
-
-        if (changes.length > maxDisplay) {
-            message += `\n  - ... 还有 ${changes.length - maxDisplay} 个文件`;
-        }
-
-        return message;
     }
 }

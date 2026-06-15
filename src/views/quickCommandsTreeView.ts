@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
 import { QuickCommandDetector } from '../core/quickCommandDetector';
 import { QuickCommand, QuickCommandGroup } from '../types';
-import { executeRemoteCommand, isExecuting, formatError } from '../core/sshClient';
+import { executeRemoteCommand, isExecuting } from '../core/sshClient';
+import { formatError } from '../pure/errors';
 import { getOutputChannelManager, UnifiedOutputChannel } from '../utils/outputChannel';
 import { getConfig } from '../config';
 
