@@ -302,7 +302,7 @@ export class ChangesTreeView {
                 });
 
                 try {
-                    await this.uploadService.uploadSingleChange(change);
+                    await this.uploadService.uploadSingleChange(change, { suppressProgress: true });
                 } catch (error: any) {
                     failures.push(`${change.relativePath}: ${formatError(error)}`);
                 }
@@ -375,7 +375,7 @@ export class ChangesTreeView {
                 });
 
                 try {
-                    await this.uploadService.uploadCommitFile(fileChange);
+                    await this.uploadService.uploadCommitFile(fileChange, { suppressProgress: true });
                 } catch (error: any) {
                     failures.push(`${fileChange.displayPath}: ${formatError(error)}`);
                 }

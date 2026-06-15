@@ -201,7 +201,13 @@ export class FileUploader {
         }
     }
 
-    async uploadFile(localPath: string): Promise<void> {
+    /**
+     * 上传文件或目录到远程服务器。
+     *
+     * @param localPath 本地文件/目录路径
+     * @param options.suppressProgress 为 true 时跳过进度弹窗（用于批量场景，避免与外层进度弹窗冲突）
+     */
+    async uploadFile(localPath: string, options?: { suppressProgress?: boolean }): Promise<void> {
         const project = matchProject(localPath);
         
         if (!project) {
@@ -215,52 +221,60 @@ export class FileUploader {
         const isDirectory = stat.isDirectory();
         const name = path.basename(localPath);
 
-        try {
-            await vscode.window.withProgress({
-                location: vscode.ProgressLocation.Notification,
-                title: `RemoteTest - ${project.name}`,
-                cancellable: false
-            }, async (progress) => {
-                if (isDirectory) {
-                    progress.report({ message: `正在扫描目录: ${name}` });
-                    const files = this.getAllFiles(localPath);
-                    
-                    if (files.length === 0) {
-                        vscode.window.setStatusBarMessage(`目录 ${name} 中没有可上传的文件`, 3000);
-                        return;
-                    }
-
-                    progress.report({ message: `发现 ${files.length} 个文件，开始上传...` });
-                    
-                    const scpClient = new SCPClient(project.server, true, project);
-                    try {
-                        for (let i = 0; i < files.length; i++) {
-                            const file = files[i];
-                            const fileName = path.basename(file);
-                            progress.report({ message: `上传文件 (${i + 1}/${files.length}): ${fileName}` });
-                            
-                            const remotePath = this.calculateRemotePathForFile(file, project);
-                            await scpClient.uploadFile(file, remotePath);
-                        }
-                    } finally {
-                        try { await scpClient.disconnect(); } catch {}
-                    }
-                    
-                    vscode.window.setStatusBarMessage(`目录 ${name} 上传完成，共 ${files.length} 个文件`, 3000);
-                } else {
-                    progress.report({ message: `正在上传: ${name}` });
-                    
-                    const remotePath = this.calculateRemotePathForFile(localPath, project);
-                    const scpClient = new SCPClient(project.server, true, project);
-                    try {
-                        await scpClient.uploadFile(localPath, remotePath);
-                    } finally {
-                        try { await scpClient.disconnect(); } catch {}
-                    }
-                    
-                    vscode.window.setStatusBarMessage(`文件 ${name} 上传完成`, 3000);
+        const doUpload = async (progress?: vscode.Progress<{ message?: string }>) => {
+            if (isDirectory) {
+                progress?.report({ message: `正在扫描目录: ${name}` });
+                const files = this.getAllFiles(localPath);
+                
+                if (files.length === 0) {
+                    vscode.window.setStatusBarMessage(`目录 ${name} 中没有可上传的文件`, 3000);
+                    return;
                 }
-            });
+
+                progress?.report({ message: `发现 ${files.length} 个文件，开始上传...` });
+                
+                const scpClient = new SCPClient(project.server, true, project);
+                try {
+                    for (let i = 0; i < files.length; i++) {
+                        const file = files[i];
+                        const fileName = path.basename(file);
+                        progress?.report({ message: `上传文件 (${i + 1}/${files.length}): ${fileName}` });
+                        
+                        const remotePath = this.calculateRemotePathForFile(file, project);
+                        await scpClient.uploadFile(file, remotePath);
+                    }
+                } finally {
+                    try { await scpClient.disconnect(); } catch {}
+                }
+                
+                vscode.window.setStatusBarMessage(`目录 ${name} 上传完成，共 ${files.length} 个文件`, 3000);
+            } else {
+                progress?.report({ message: `正在上传: ${name}` });
+                
+                const remotePath = this.calculateRemotePathForFile(localPath, project);
+                const scpClient = new SCPClient(project.server, true, project);
+                try {
+                    await scpClient.uploadFile(localPath, remotePath);
+                } finally {
+                    try { await scpClient.disconnect(); } catch {}
+                }
+                
+                vscode.window.setStatusBarMessage(`文件 ${name} 上传完成`, 3000);
+            }
+        };
+
+        try {
+            if (options?.suppressProgress) {
+                await doUpload();
+            } else {
+                await vscode.window.withProgress({
+                    location: vscode.ProgressLocation.Notification,
+                    title: `RemoteTest - ${project.name}`,
+                    cancellable: false
+                }, async (progress) => {
+                    await doUpload(progress);
+                });
+            }
         } catch (error: any) {
             this.pluginChannel.error(`[上传失败] ${formatError(error)}`);
             throw error;

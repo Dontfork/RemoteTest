@@ -35,13 +35,24 @@ export class ChangesUploadService {
         return { ok: true };
     }
 
-    /** 上传单个变更文件。 */
-    async uploadSingleChange(change: GitChange): Promise<void> {
-        await this.fileUploader.uploadFile(change.path);
+    /**
+     * 上传单个变更文件。
+     *
+     * @param change 变更信息
+     * @param options.suppressProgress 为 true 时跳过 uploadFile 自身的进度弹窗
+     *   （批量上传场景由调用方统一展示进度，避免双重弹窗）
+     */
+    async uploadSingleChange(change: GitChange, options?: { suppressProgress?: boolean }): Promise<void> {
+        await this.fileUploader.uploadFile(change.path, options);
     }
 
-    /** 上传 commit 中的单个文件。 */
-    async uploadCommitFile(fileChange: CommitFileChange): Promise<void> {
+    /**
+     * 上传 commit 中的单个文件。
+     *
+     * @param fileChange commit 文件变更信息
+     * @param options.suppressProgress 为 true 时跳过 uploadFile 自身的进度弹窗
+     */
+    async uploadCommitFile(fileChange: CommitFileChange, options?: { suppressProgress?: boolean }): Promise<void> {
         const project = fileChange.project;
         if (!project.localPath) {
             throw new Error(`工程 "${project.name}" 未配置 localPath，无法上传文件`);
@@ -52,7 +63,7 @@ export class ChangesUploadService {
             throw new Error(`本地文件不存在: ${localPath}`);
         }
 
-        await this.fileUploader.uploadFile(localPath);
+        await this.fileUploader.uploadFile(localPath, options);
     }
 
     /** 删除远程文件。 */
